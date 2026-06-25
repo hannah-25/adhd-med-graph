@@ -11,6 +11,7 @@ Package: `adhd-med-graph`
 - `.gitignore`
 - `AGENTS.md`
 - `ARCHITECTURE.md`
+- `CLAUDE.md`
 - `README.md`
 - `docs/README.md`
 - `docs/agent/agent-workflow.md`
