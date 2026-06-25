@@ -1,2 +1,11 @@
 screenshot-*.png
 .DS_Store
+.idea/
+.env
+.env.*
+!.env.example
+node_modules/
+coverage/
+dist/
+research/open-source/*
+!research/open-source/README.md
