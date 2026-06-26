@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ADHD 약물 농도 그래프 (프로토타입)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="app-header">
+      <h1 id="medName">약물 농도</h1>
+      <p id="medGeneric">교육용 추정 그래프 · 의료 조언 아님</p>
+    </header>
+
+    <!-- Medication selector -->
+    <section class="card controls">
+      <div class="control-row">
+        <span>약물</span>
+        <div class="seg" id="medSeg" role="group" aria-label="약물 선택"></div>
+      </div>
+    </section>
+
+    <!-- Concentration chart card -->
+    <section class="card">
+      <div class="card-head">
+        <h2>혈중 농도 추정</h2>
+        <button class="icon-btn" id="infoBtn" aria-label="그래프 설명 열기">ℹ</button>
+      </div>
+
+      <div class="chart-wrap">
+        <svg class="chart" id="chart" viewBox="0 0 360 200" role="img"
+             aria-label="시간에 따른 혈중 농도 추정 곡선"></svg>
+      </div>
+
+      <div class="chart-legend" id="legend">
+        <span><span class="swatch" style="background:var(--accent)"></span>전체</span>
+        <span class="comp-only"><span class="swatch" style="background:var(--ir)"></span>즉시방출(IR)</span>
+        <span class="comp-only"><span class="swatch" style="background:var(--er)"></span>서방형(ER)</span>
+      </div>
+
+      <div class="chips">
+        <div class="chip">
+          <span class="label">1차 피크</span>
+          <span class="value" id="chipFirst">–<span class="unit"> h</span></span>
+        </div>
+        <div class="chip">
+          <span class="label">최대 농도</span>
+          <span class="value" id="chipMax">–<span class="unit"> h</span></span>
+        </div>
+        <div class="chip">
+          <span class="label">작용 종료</span>
+          <span class="value" id="chipEnd">–<span class="unit"> h</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dose controls -->
+    <section class="card controls">
+      <div class="control-row">
+        <span>용량</span>
+        <div class="seg" id="doseSeg" role="group" aria-label="용량 선택"></div>
+      </div>
+      <div class="control-row" id="compRow">
+        <label class="toggle">
+          <input type="checkbox" id="compToggle" />
+          IR / ER 구성 곡선 보기
+        </label>
+      </div>
+    </section>
+
+    <!-- Locked advanced feature -->
+    <section class="card locked">
+      <div class="locked-body">
+        <div class="card-head"><h2>개인 반응 보정</h2></div>
+        <p style="color:var(--text-dim);font-size:13px;margin:0">
+          체중·대사·복용 기록을 반영해 곡선을 개인화합니다.
+        </p>
+      </div>
+      <div class="locked-overlay">
+        <div class="lock">🔒</div>
+        <div class="title">개인 반응 보정</div>
+        <div class="sub">개인화된 곡선 보정은 추후 제공됩니다.</div>
+        <span class="pill">PRO</span>
+      </div>
+    </section>
+
+    <!-- Medical safety copy -->
+    <section class="safety">
+      <strong>의료 안전 안내.</strong>
+      이 그래프는 평균 데이터 기반의 <strong>교육용 추정치</strong>입니다.
+      실제 혈중 농도·효과·부작용·개인 반응은 크게 다를 수 있습니다.
+      복용량이나 복용 시간 변경은 반드시 처방 의료진과 상의하세요.
+      본 화면은 진단·처방·복용 지시가 아닙니다.
+    </section>
+  </main>
+
+  <!-- Info bottom sheet -->
+  <div class="sheet-backdrop" id="backdrop"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="grabber"></div>
+    <h3 id="sheetTitle">이 그래프는 무엇인가요?</h3>
+    <div id="sheetBody"></div>
+    <button class="close" id="sheetClose">닫기</button>
+  </div>
+
+  <script type="module">
+    import { profiles } from "./pk-profiles.js";
+    import { createDoseEvent } from "./dose-events.js";
+    import { buildConcentrationSeries } from "./concentration-series.js";
+
+    // UI-only configuration per medication (dose options + info copy).
+    const DEMO_MEDS = [
+      {
+        id: "concerta-oros",
+        label: "콘서타",
+        doses: [18, 27, 36, 54],
+        defaultDose: 18,
+        sheet: [
+          "콘서타는 알약 겉면의 <strong>즉시방출(IR, 22%)</strong>이 1시간 안에 첫 봉우리를 만들고, 내부 삼투압(OROS) 시스템의 <strong>서방형(ER, 78%)</strong>이 약을 서서히 밀어내며 약 6.8시간에 최고 농도에 도달합니다.",
+          "이후 농도는 반감기 약 3.5시간을 따라 점차 감소합니다. 곡선은 성인 평균 데이터에 맞춰 보정한 추정값이며 단위는 ng/mL입니다.",
+          "개인의 체중·대사·다른 약물·식사에 따라 실제 곡선은 달라질 수 있습니다.",
+        ],
+      },
+      {
+        id: "methylphenidate-ir",
+        label: "페니드",
+        doses: [5, 10, 20],
+        defaultDose: 10,
+        sheet: [
+          "속방형 메틸페니데이트는 먹은 뒤 빠르게 흡수되어 약 <strong>1.5시간에 단일 최고 농도</strong>에 도달합니다. 콘서타 같은 서방 단계가 없어 봉우리가 하나입니다.",
+          "이후 반감기 약 3시간을 따라 감소합니다. 작용 시간이 짧아 보통 하루 2~3회 나눠 복용합니다.",
+          "표시 값은 성인 평균 기반 추정이며 개인차가 있습니다. 단위는 ng/mL입니다.",
+        ],
+      },
+      {
+        id: "methylphenidate-medikinet",
+        label: "메디키넷",
+        doses: [10, 20, 30, 40],
+        defaultDose: 20,
+        sheet: [
+          "메디키넷 리타드는 캡슐의 <strong>절반(50%)이 즉시방출(IR)</strong>되어 빠른 초기 상승을 만들고, 나머지 <strong>절반(50%)이 서서히 방출(ER)</strong>되어 3~4시간 플래토를 형성합니다. 아침 식후 복용이 권장됩니다.",
+          "전체 최고 농도는 약 2.75시간이며, 이후 반감기 약 3.2시간을 따라 완만히 감소합니다. 단위는 ng/mL입니다.",
+          "표시 값은 성인 평균 기반 추정이며 개인차가 있습니다.",
+        ],
+      },
+    ];
+
+    // Geometry
+    const W = 360, H = 200, padL = 30, padR = 12, padT = 12, padB = 24;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+    const grid = { startHour: 0, endHour: 24, stepMinutes: 10 };
+
+    const xOf = (h) => padL + (h / grid.endHour) * plotW;
+
+    function seriesFor(profile, amountMg) {
+      return buildConcentrationSeries({
+        profile,
+        doseEvents: [createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: 0 })],
+        grid,
+      });
+    }
+
+    function findFirstPeak(series) {
+      for (let i = 1; i < series.length - 1; i += 1) {
+        if (series[i].hour > 3.5) break;
+        if (series[i].raw >= series[i - 1].raw && series[i].raw > series[i + 1].raw) return series[i];
+      }
+      return series[0];
+    }
+
+    const chart = document.getElementById("chart");
+    const medSeg = document.getElementById("medSeg");
+    const doseSeg = document.getElementById("doseSeg");
+
+    let medConfig = DEMO_MEDS[0];
+    let profile = profiles[medConfig.id];
+    let dose = medConfig.defaultDose;
+    let yMax = 1;
+    let showComponents = false;
+
+    function hasErStage() {
+      return profile.release.irFraction < 1;
+    }
+
+    // Fixed Y scale per medication (largest dose) so dose changes are comparable.
+    function recomputeYMax() {
+      const topDose = Math.max(...medConfig.doses);
+      yMax = seriesFor(profile, topDose).stats.cmaxRaw * 1.1;
+    }
+    const yOf = (v) => padT + plotH - (v / yMax) * plotH;
+
+    function pathFrom(points) {
+      return points
+        .map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.hour).toFixed(1)} ${yOf(p.raw).toFixed(1)}`)
+        .join(" ");
+    }
+    function areaFrom(points) {
+      const x0 = xOf(points[0].hour).toFixed(1);
+      const xN = xOf(points[points.length - 1].hour).toFixed(1);
+      const yBase = yOf(0).toFixed(1);
+      return `${pathFrom(points)} L${xN} ${yBase} L${x0} ${yBase} Z`;
+    }
+
+    function renderSegments() {
+      medSeg.innerHTML = DEMO_MEDS.map(
+        (m) => `<button data-med="${m.id}" aria-pressed="${m.id === medConfig.id}">${m.label}</button>`,
+      ).join("");
+      doseSeg.innerHTML = medConfig.doses
+        .map((d) => `<button data-dose="${d}" aria-pressed="${d === dose}">${d}mg</button>`)
+        .join("");
+      // Hide IR/ER toggle for single-peak (immediate-release) medications.
+      document.getElementById("compRow").style.display = hasErStage() ? "" : "none";
+    }
+
+    function render() {
+      const { series, components, stats } = seriesFor(profile, dose);
+      const firstPeak = findFirstPeak(series);
+      const svg = [];
+
+      for (const frac of [0, 0.5, 1]) {
+        const v = yMax * frac;
+        const y = yOf(v).toFixed(1);
+        svg.push(`<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`);
+        svg.push(`<text x="${padL - 5}" y="${(+y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${v.toFixed(1)}</text>`);
+      }
+      for (const h of [0, 4, 8, 12, 16, 20, 24]) {
+        svg.push(`<text x="${xOf(h).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${h}</text>`);
+      }
+
+      const ex0 = xOf(profile.effectStartHours).toFixed(1);
+      const ex1 = xOf(Math.min(profile.effectEndHours, grid.endHour)).toFixed(1);
+      svg.push(`<rect x="${ex0}" y="${padT}" width="${(ex1 - ex0).toFixed(1)}" height="${plotH}" fill="var(--accent-soft)"/>`);
+
+      svg.push(`<path d="${areaFrom(series)}" fill="var(--accent-soft)"/>`);
+      svg.push(`<path d="${pathFrom(series)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`);
+
+      if (showComponents && hasErStage()) {
+        svg.push(`<path d="${pathFrom(components.ir)}" fill="none" stroke="var(--ir)" stroke-width="1.6" stroke-dasharray="4 3"/>`);
+        svg.push(`<path d="${pathFrom(components.er)}" fill="none" stroke="var(--er)" stroke-width="1.6" stroke-dasharray="4 3"/>`);
+      }
+
+      const markers = [
+        { p: firstPeak, color: "var(--ir)" },
+        { p: { hour: stats.tmaxHour, raw: stats.cmaxRaw }, color: "var(--accent)" },
+      ];
+      for (const m of markers) {
+        svg.push(`<circle cx="${xOf(m.p.hour).toFixed(1)}" cy="${yOf(m.p.raw).toFixed(1)}" r="3.2" fill="${m.color}" stroke="var(--surface)" stroke-width="1.5"/>`);
+      }
+
+      chart.innerHTML = svg.join("");
+
+      // First-peak chip only when a distinct early IR bump precedes the main peak
+      // (e.g. Concerta). For single-peak / peak-plus-plateau curves, show "–".
+      const hasDistinctFirstPeak = hasErStage() && stats.tmaxHour - firstPeak.hour > 0.5;
+      const firstLabel = hasDistinctFirstPeak ? `${firstPeak.hour.toFixed(1)}<span class="unit"> h</span>` : "–";
+      document.getElementById("chipFirst").innerHTML = firstLabel;
+      document.getElementById("chipMax").innerHTML = `${stats.tmaxHour.toFixed(1)}<span class="unit"> h · ${stats.cmaxRaw.toFixed(1)} ng/mL</span>`;
+      document.getElementById("chipEnd").innerHTML = `${profile.effectEndHours}<span class="unit"> h</span>`;
+
+      document.querySelectorAll(".comp-only").forEach((el) => {
+        el.style.display = showComponents && hasErStage() ? "" : "none";
+      });
+
+      // Header + sheet content (상품명 우선 표기)
+      document.getElementById("medName").textContent = `${profile.brandName} 농도`;
+      document.getElementById("medGeneric").textContent =
+        `${profile.displayName} · ${profile.genericName} · 교육용 추정 · 의료 조언 아님`;
+      document.getElementById("sheetBody").innerHTML = medConfig.sheet.map((p) => `<p>${p}</p>`).join("");
+    }
+
+    function selectMed(id) {
+      medConfig = DEMO_MEDS.find((m) => m.id === id);
+      profile = profiles[medConfig.id];
+      dose = medConfig.defaultDose;
+      showComponents = false;
+      document.getElementById("compToggle").checked = false;
+      recomputeYMax();
+      renderSegments();
+      render();
+    }
+
+    medSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-med]");
+      if (btn) selectMed(btn.dataset.med);
+    });
+    doseSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-dose]");
+      if (!btn) return;
+      dose = Number(btn.dataset.dose);
+      doseSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    document.getElementById("compToggle").addEventListener("change", (e) => {
+      showComponents = e.target.checked;
+      render();
+    });
+
+    // Info bottom sheet
+    const backdrop = document.getElementById("backdrop");
+    const sheet = document.getElementById("sheet");
+    const open = () => { backdrop.dataset.open = "true"; sheet.dataset.open = "true"; };
+    const close = () => { backdrop.dataset.open = "false"; sheet.dataset.open = "false"; };
+    document.getElementById("infoBtn").addEventListener("click", open);
+    document.getElementById("sheetClose").addEventListener("click", close);
+    backdrop.addEventListener("click", close);
+
+    // Init (optional ?med=<id> deep link for previews)
+    const requested = new URLSearchParams(location.search).get("med");
+    if (requested && DEMO_MEDS.some((m) => m.id === requested)) {
+      selectMed(requested);
+    } else {
+      recomputeYMax();
+      renderSegments();
+      render();
+    }
+  </script>
+</body>
+</html>

@@ -39,7 +39,7 @@ No persisted database schema exists in this repository.
 
 ## Existing Prototype Files
 
-Prototype directory does not exist yet.
+Prototype directory exists. Inspect tracked files for exact schemas.
 
 ## Source Rule Document
 

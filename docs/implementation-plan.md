@@ -1,41 +1,49 @@
 # 구현 계획
 
-## 1단계: 연구 워크스페이스 안정화
+## 1단계: 워크스페이스 정리
 
 상태: 완료
 
-- 참고 저장소는 `research/open-source/` 아래에 둡니다.
-- 참고 저장소 원본 코드는 git에 포함하지 않습니다.
-- 분석 결과와 프로젝트 문서만 Markdown으로 추적합니다.
+- 이전 참고 이미지, 레퍼런스 자료, 실행 프로토타입을 삭제했습니다.
+- 새 그래프는 기존 참고 자료를 전제로 하지 않고 다시 설계합니다.
+- 프로젝트 문서와 하네스만 남깁니다.
 - 루트 패키지 이름을 `adhd-med-graph`로 정리했습니다.
-- 이전 정적 데모 파일은 루트에서 제거하고 참고 폴더에만 남겼습니다.
 
 ## 2단계: 깨끗한 프로토타입 모델 분리
+
+상태: 완료 (콘서타 OROS)
 
 `prototype/` 폴더를 만들고 독립 모듈을 구현합니다.
 
 1. `pk-profiles.js`
-   - 콘서타 OROS부터 시작합니다.
-   - 카페인은 비교 입력으로 유지하되 제품 정체성에는 넣지 않습니다.
+   - 새 설계에서 선택한 1차 약물부터 시작합니다.
 2. `dose-events.js`
    - 예정 복용, 실제 복용, 건너뜀, 보정 이벤트 형태를 정의합니다.
    - 반복 복용을 concrete event 목록으로 펼치는 helper를 만듭니다.
 3. `pharmacokinetics.js`
    - 반감기, 흡수, 피크 정규화, OROS 이중 방출 로직을 독립 구현합니다.
-   - 참고 오픈소스 코드를 복사하지 않습니다.
+   - 외부 참고 소스 코드를 복사하지 않습니다.
 4. `concentration-series.js`
    - 차트용 정규화 시계열을 만듭니다.
    - OROS 약물은 IR/ER 구성 시계열도 함께 반환합니다.
 
 완료 기준:
 
-- 같은 콘서타 입력에서 참고 폴더의 원본 데모와 비슷한 곡선이 나옵니다.
+- 단순 입력에서 의도한 곡선 형태가 재현됩니다.
 - 모델이 DOM 없이 실행됩니다.
 - 단순 입력으로 검증할 수 있습니다.
 
 ## 3단계: 목표 모바일 UI 프로토타입
 
-참고 폴더의 기존 `index.html`을 계속 키우지 않고 새 데모 페이지를 만듭니다.
+상태: 완료 (콘서타)
+
+- `prototype/concentration-demo.html` + `prototype/styles.css` 구현.
+- 모델 모듈을 `<script type="module">`에서 직접 import, 계산은 모델에만 둠.
+- SVG 차트(전체 곡선 + 효과 구간 음영 + IR 봉우리/Cmax 마커), IR/ER 구성 곡선 토글, 용량 세그먼트, 정보 바텀시트, 잠금(PRO) 오버레이, 의료 안전 문구 포함.
+- 약물 전환 지원(프로필 레지스트리 기반): 약물별로 곡선·용량 옵션·칩·설명이 동적으로 바뀜. 단일 봉우리(속방형) 약물은 1차 피크 칩과 IR/ER 토글을 자동 숨김. `?med=<id>` 딥링크 지원.
+- 용량 비교를 위해 Y축은 약물별 최대 용량 기준 고정.
+
+새 데모 페이지를 만듭니다.
 
 ```txt
 prototype/concentration-demo.html
@@ -51,20 +59,34 @@ prototype/concentration-demo.html
 
 완료 기준:
 
-- 참고 이미지와 같은 구조를 갖습니다.
 - 모바일 폭에서 텍스트가 겹치지 않습니다.
-- 잠금 상태에서도 기본 그래프는 이해 가능합니다.
+- 기본 그래프와 안전 문구를 이해할 수 있습니다.
 
 ## 4단계: 근거와 PK 프로필 확장
 
-다음 프로필을 순차적으로 추가합니다.
+상태: 진행 중. **프로필 단위 = 성분 × 제형(브랜드 무관)**. Attune이 한국 제품이므로 국내 약 우선.
 
-- Concerta OROS
-- immediate-release methylphenidate
-- 주요 methylphenidate ER 캡슐 패턴
-- caffeine
-- atomoxetine
-- selected SSRI/SNRI long-term medications
+### 우선순위 1 — 국내 (성분 2개 = 프로필 6개)
+
+- [x] MPH · OROS 서방정 (콘서타) — `concerta-oros`
+- [x] MPH · 속방정 (페니드) — `methylphenidate-ir`. 단일 봉우리, FDA IR 라벨 기준(t½ 3.0h, Tmax ~1.5h, AUC/mg 2.53)
+- [~] MPH · 서방캡슐 beads (메타데이트 CD) — **제외**: 국내 공급 중단(2019). 기본 선택지 부적절.
+- [x] MPH · 서방캡슐 (메디키넷 리타드) — `methylphenidate-medikinet`. EU SmPC 기준(50% IR + 50% ER, Cmax 6.4 @2.75h, AUC 48.9, t½ 3.2h), IR 피크 + 3~4h 플래토
+- [~] MPH · 조절방출캡슐 (비스펜틴) — **제외**: 국내 미사용.
+- [ ] atomoxetine · 캡슐 (스트라테라 외 국내 6종 = 동일 프로필 1개) — 누적형 → 별도 정상상태(steady-state) 표현 ([attune-porting-spec.md](attune-porting-spec.md) §9)
+
+국내 자극제(MPH) 곡선은 **콘서타·페니드·메디키넷 3종으로 완료**다(메타데이트 CD·비스펜틴은 국내 미사용으로 제외). 남은 국내 약물은 atomoxetine 1개이며, 누적형이라 당일 곡선이 아닌 정상상태 표현을 별도로 설계한다.
+
+### 우선순위 2 — 해외 (확장 시)
+
+성분 × 제형으로 묶는다. 새 모델이 필요한 건 경피 패치(Daytrana)뿐이고, 나머지는 파라미터/반감기 변경 + 누적형 표현이다.
+
+- d-MPH (Focalin / XR), MPH ER 변형(Aptensio XR, Quillivant, QuilliChew, Cotempla, Ritalin LA), 지연방출(Jornay PM), 프로드러그(Azstarys)
+- 경피 패치(Daytrana) — 새 zero-order 흡수 모델 필요
+- 암페타민(Adderall/XR, Vyvanse, Dexedrine, Evekeo, Mydayis, Dyanavel, Zenzedi, Desoxyn) — 같은 모델, 반감기 ~10–13h
+- 알파2 작용제(Intuniv 구안파신, Kapvay 클로니딘), NRI(Qelbree 빌록사진) — 누적형 → 정상상태 표현
+
+제외: SSRI/SNRI는 ADHD 약이 아니므로 제외한다. 카페인은 모델 테스트용 옵션으로만 둔다.
 
 각 프로필에는 다음을 포함합니다.
 
@@ -75,6 +97,10 @@ prototype/concentration-demo.html
 - safety caveat
 
 ## 5단계: 에이튠 이식 명세
+
+상태: 초안 완료 — [docs/attune-porting-spec.md](attune-porting-spec.md)
+
+실제 attune-be/attune-fe 구조를 읽고(수정 없음) 명세를 작성했습니다. 핵심: 현재 혈중 농도 그래프는 정적 이미지(`Medication.graphUrl`)이며, 이를 PK 모델 기반 동적 곡선으로 점진 전환합니다.
 
 로컬 프로토타입이 안정된 뒤에만 에이튠 전용 명세를 작성합니다.
 

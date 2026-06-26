@@ -6,6 +6,7 @@ Package: `adhd-med-graph`
 
 ## Files
 
+- `.claude/settings.local.json`
 - `.env.example`
 - `.github/workflows/ci.yml`
 - `.gitignore`
@@ -34,6 +35,7 @@ Package: `adhd-med-graph`
 - `docs/architecture/module-rules.md`
 - `docs/architecture/security-rules.md`
 - `docs/architecture/system-overview.md`
+- `docs/attune-porting-spec.md`
 - `docs/engineering/ci-cd-rules.md`
 - `docs/engineering/coding-conventions.md`
 - `docs/engineering/deployment-rules.md`
@@ -49,15 +51,23 @@ Package: `adhd-med-graph`
 - `docs/generated/project-map.md`
 - `docs/harness-change-summary.md`
 - `docs/implementation-plan.md`
+- `docs/product/concerta-pk-reference.md`
 - `docs/product/domain-overview.md`
 - `docs/product/index.md`
+- `docs/product/methylphenidate-ir-reference.md`
+- `docs/product/methylphenidate-medikinet-reference.md`
 - `docs/quality/maintainability.md`
 - `docs/quality/quality-score.md`
 - `docs/quality/reliability.md`
 - `docs/quality/security.md`
 - `package.json`
-- `research/README.md`
-- `research/open-source-analysis.md`
+- `prototype/concentration-demo.html`
+- `prototype/concentration-series.js`
+- `prototype/dose-events.js`
+- `prototype/model.test.mjs`
+- `prototype/pharmacokinetics.js`
+- `prototype/pk-profiles.js`
+- `prototype/styles.css`
 - `scripts/agent/architecture-check.mjs`
 - `scripts/agent/bootstrap`
 - `scripts/agent/bootstrap.mjs`
