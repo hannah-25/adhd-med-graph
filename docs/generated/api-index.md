@@ -12,6 +12,8 @@ This repository has no HTTP API. The index below lists exported JavaScript symbo
 - `createDoseEvent` from `prototype/dose-events.js`
 - `expandSchedule` from `prototype/dose-events.js`
 - `activeDoseEvents` from `prototype/dose-events.js`
+- `effectAccrualFraction` from `prototype/effect-model.js`
+- `buildEffectAccrualSeries` from `prototype/effect-model.js`
 - `eliminationRate` from `prototype/pharmacokinetics.js`
 - `weibullReleasedFraction` from `prototype/pharmacokinetics.js`
 - `firstOrderReleasedFraction` from `prototype/pharmacokinetics.js`
@@ -21,6 +23,7 @@ This repository has no HTTP API. The index below lists exported JavaScript symbo
 - `concertaOros` from `prototype/pk-profiles.js`
 - `methylphenidateIr` from `prototype/pk-profiles.js`
 - `medikinetRetard` from `prototype/pk-profiles.js`
+- `atomoxetine` from `prototype/pk-profiles.js`
 - `profiles` from `prototype/pk-profiles.js`
 - `getProfile` from `prototype/pk-profiles.js`
 - `rootDir` from `scripts/agent/lib.mjs`

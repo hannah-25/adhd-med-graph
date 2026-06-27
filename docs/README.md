@@ -9,6 +9,7 @@ This directory is the project knowledge store. Keep `AGENTS.md` short and link h
 - [product/concerta-pk-reference.md](product/concerta-pk-reference.md): Concerta PK reference data (FDA label + PLOS One Weibull model).
 - [product/methylphenidate-ir-reference.md](product/methylphenidate-ir-reference.md): IR methylphenidate PK reference data (Ritalin FDA label + adult PK study).
 - [product/methylphenidate-medikinet-reference.md](product/methylphenidate-medikinet-reference.md): Medikinet retard PK reference data (EU SmPC).
+- [product/atomoxetine-reference.md](product/atomoxetine-reference.md): Atomoxetine accumulation-type representation reference (Strattera FDA label + clinical course).
 
 ## Architecture
 

@@ -21,10 +21,33 @@
       </div>
     </section>
 
+    <!-- Effect accrual (accumulation meds only, e.g. atomoxetine) -->
+    <section class="card" id="effectCard" hidden>
+      <div class="card-head"><h2>효과 누적 진행</h2></div>
+      <div class="chart-wrap">
+        <svg class="chart" id="effectChart" viewBox="0 0 360 130" role="img"
+             aria-label="주 단위 임상 효과 누적 경과"></svg>
+      </div>
+      <div class="chips">
+        <div class="chip"><span class="label">효과 발현</span><span class="value" id="chipOnset">–<span class="unit"> 주</span></span></div>
+        <div class="chip"><span class="label">안정화</span><span class="value" id="chipStabilize">–<span class="unit"> 주</span></span></div>
+        <div class="chip"><span class="label">현재 효과</span><span class="value" id="chipNow">–<span class="unit"> %</span></span></div>
+      </div>
+      <p class="note">혈중 농도가 아니라 <strong>임상 효과의 누적 경과</strong>입니다. 효과는 수주에 걸쳐 나타납니다.</p>
+    </section>
+
+    <!-- Weeks control (accumulation meds only) -->
+    <section class="card controls" id="weeksCard" hidden>
+      <div class="control-row">
+        <span>복용 주차</span>
+        <div class="seg" id="weekSeg" role="group" aria-label="복용 주차 선택"></div>
+      </div>
+    </section>
+
     <!-- Concentration chart card -->
     <section class="card">
       <div class="card-head">
-        <h2>혈중 농도 추정</h2>
+        <h2 id="chartTitle">혈중 농도 추정</h2>
         <button class="icon-btn" id="infoBtn" aria-label="그래프 설명 열기">ℹ</button>
       </div>
 
@@ -39,7 +62,7 @@
         <span class="comp-only"><span class="swatch" style="background:var(--er)"></span>서방형(ER)</span>
       </div>
 
-      <div class="chips">
+      <div class="chips" id="chartChips">
         <div class="chip">
           <span class="label">1차 피크</span>
           <span class="value" id="chipFirst">–<span class="unit"> h</span></span>
@@ -53,10 +76,11 @@
           <span class="value" id="chipEnd">–<span class="unit"> h</span></span>
         </div>
       </div>
+      <p class="note" id="chartNote" hidden></p>
     </section>
 
     <!-- Dose controls -->
-    <section class="card controls">
+    <section class="card controls" id="doseCard">
       <div class="control-row">
         <span>용량</span>
         <div class="seg" id="doseSeg" role="group" aria-label="용량 선택"></div>
@@ -108,6 +132,7 @@
     import { profiles } from "./pk-profiles.js";
     import { createDoseEvent } from "./dose-events.js";
     import { buildConcentrationSeries } from "./concentration-series.js";
+    import { buildEffectAccrualSeries, effectAccrualFraction } from "./effect-model.js";
 
     // UI-only configuration per medication (dose options + info copy).
     const DEMO_MEDS = [
@@ -144,6 +169,20 @@
           "표시 값은 성인 평균 기반 추정이며 개인차가 있습니다.",
         ],
       },
+      {
+        id: "atomoxetine",
+        label: "스트라테라",
+        accumulation: true,
+        weeks: [0, 2, 4, 6, 8, 10],
+        defaultWeek: 8,
+        doses: [40], // normalized daily curve — dose does not change the % shape
+        defaultDose: 40,
+        sheet: [
+          "아토목세틴은 <strong>비자극제</strong>입니다. 자극제와 달리 먹는 즉시 효과를 느끼는 약이 아니라, <strong>효과가 수주에 걸쳐 누적</strong>됩니다. FDA 효능 시험은 6~10주였고 위약 대비 유의한 개선이 약 8주까지 확인됐습니다(위 효과 누적 진행).",
+          "혈중 농도 자체는 며칠 안에 안정됩니다. 아래 일일 곡선은 매일 같은 시간 복용해 농도가 안정된 뒤의 하루 패턴(정규화)이며, <strong>효과의 세기를 나타내지 않습니다</strong>.",
+          "CYP2D6 저대사자는 농도가 크게 높아질 수 있습니다. 효과가 느려도 임의로 끊지 말고 의료진과 상의하세요.",
+        ],
+      },
     ];
 
     // Geometry
@@ -171,29 +210,28 @@
     }
 
     const chart = document.getElementById("chart");
+    const effectChart = document.getElementById("effectChart");
     const medSeg = document.getElementById("medSeg");
     const doseSeg = document.getElementById("doseSeg");
+    const weekSeg = document.getElementById("weekSeg");
 
     let medConfig = DEMO_MEDS[0];
     let profile = profiles[medConfig.id];
     let dose = medConfig.defaultDose;
+    let week = medConfig.defaultWeek ?? 0;
     let yMax = 1;
     let showComponents = false;
 
-    function hasErStage() {
-      return profile.release.irFraction < 1;
-    }
+    const isAccum = () => profile.modelKind === "accumulation";
+    const hasErStage = () => profile.release.irFraction < 1;
 
-    // Fixed Y scale per medication (largest dose) so dose changes are comparable.
-    function recomputeYMax() {
-      const topDose = Math.max(...medConfig.doses);
-      yMax = seriesFor(profile, topDose).stats.cmaxRaw * 1.1;
-    }
     const yOf = (v) => padT + plotH - (v / yMax) * plotH;
+    // value accessor: normalized (%) for accumulation meds, else raw ng/mL
+    const dv = (p) => (isAccum() ? p.percent : p.raw);
 
     function pathFrom(points) {
       return points
-        .map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.hour).toFixed(1)} ${yOf(p.raw).toFixed(1)}`)
+        .map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.hour).toFixed(1)} ${yOf(dv(p)).toFixed(1)}`)
         .join(" ");
     }
     function areaFrom(points) {
@@ -210,12 +248,17 @@
       doseSeg.innerHTML = medConfig.doses
         .map((d) => `<button data-dose="${d}" aria-pressed="${d === dose}">${d}mg</button>`)
         .join("");
-      // Hide IR/ER toggle for single-peak (immediate-release) medications.
+      weekSeg.innerHTML = (medConfig.weeks ?? [])
+        .map((w) => `<button data-week="${w}" aria-pressed="${w === week}">${w}주</button>`)
+        .join("");
       document.getElementById("compRow").style.display = hasErStage() ? "" : "none";
     }
 
-    function render() {
+    // ----- daily concentration curve (chart card) -----
+    function renderDailyCurve() {
+      const normalized = isAccum();
       const { series, components, stats } = seriesFor(profile, dose);
+      yMax = normalized ? 108 : seriesFor(profile, Math.max(...medConfig.doses)).stats.cmaxRaw * 1.1;
       const firstPeak = findFirstPeak(series);
       const svg = [];
 
@@ -223,7 +266,7 @@
         const v = yMax * frac;
         const y = yOf(v).toFixed(1);
         svg.push(`<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`);
-        svg.push(`<text x="${padL - 5}" y="${(+y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${v.toFixed(1)}</text>`);
+        svg.push(`<text x="${padL - 5}" y="${(+y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${normalized ? Math.round((v / yMax) * 100) : v.toFixed(1)}</text>`);
       }
       for (const h of [0, 4, 8, 12, 16, 20, 24]) {
         svg.push(`<text x="${xOf(h).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${h}</text>`);
@@ -241,29 +284,85 @@
         svg.push(`<path d="${pathFrom(components.er)}" fill="none" stroke="var(--er)" stroke-width="1.6" stroke-dasharray="4 3"/>`);
       }
 
-      const markers = [
-        { p: firstPeak, color: "var(--ir)" },
-        { p: { hour: stats.tmaxHour, raw: stats.cmaxRaw }, color: "var(--accent)" },
-      ];
+      const peakVal = normalized ? 100 : stats.cmaxRaw;
+      const markers = normalized
+        ? [{ p: { hour: stats.tmaxHour, v: peakVal }, color: "var(--accent)" }]
+        : [
+            { p: { hour: firstPeak.hour, v: firstPeak.raw }, color: "var(--ir)" },
+            { p: { hour: stats.tmaxHour, v: peakVal }, color: "var(--accent)" },
+          ];
       for (const m of markers) {
-        svg.push(`<circle cx="${xOf(m.p.hour).toFixed(1)}" cy="${yOf(m.p.raw).toFixed(1)}" r="3.2" fill="${m.color}" stroke="var(--surface)" stroke-width="1.5"/>`);
+        svg.push(`<circle cx="${xOf(m.p.hour).toFixed(1)}" cy="${yOf(m.p.v).toFixed(1)}" r="3.2" fill="${m.color}" stroke="var(--surface)" stroke-width="1.5"/>`);
       }
 
       chart.innerHTML = svg.join("");
 
-      // First-peak chip only when a distinct early IR bump precedes the main peak
-      // (e.g. Concerta). For single-peak / peak-plus-plateau curves, show "–".
+      // chips (hidden for accumulation; see render())
       const hasDistinctFirstPeak = hasErStage() && stats.tmaxHour - firstPeak.hour > 0.5;
-      const firstLabel = hasDistinctFirstPeak ? `${firstPeak.hour.toFixed(1)}<span class="unit"> h</span>` : "–";
-      document.getElementById("chipFirst").innerHTML = firstLabel;
+      document.getElementById("chipFirst").innerHTML = hasDistinctFirstPeak
+        ? `${firstPeak.hour.toFixed(1)}<span class="unit"> h</span>` : "–";
       document.getElementById("chipMax").innerHTML = `${stats.tmaxHour.toFixed(1)}<span class="unit"> h · ${stats.cmaxRaw.toFixed(1)} ng/mL</span>`;
       document.getElementById("chipEnd").innerHTML = `${profile.effectEndHours}<span class="unit"> h</span>`;
-
       document.querySelectorAll(".comp-only").forEach((el) => {
         el.style.display = showComponents && hasErStage() ? "" : "none";
       });
+    }
 
-      // Header + sheet content (상품명 우선 표기)
+    // ----- effect accrual timeline (accumulation meds only) -----
+    function renderEffect() {
+      const acc = profile.effectAccrual;
+      const endW = Math.max(...medConfig.weeks);
+      const eW = 360, eH = 130, eL = 30, eR = 12, eT = 12, eB = 22;
+      const epW = eW - eL - eR, epH = eH - eT - eB;
+      const exOf = (w) => eL + (w / endW) * epW;
+      const eyOf = (pct) => eT + epH - (pct / 100) * epH;
+      const series = buildEffectAccrualSeries({ effectAccrual: acc, endWeeks: endW, stepWeeks: 0.25 });
+      const svg = [];
+
+      for (const pct of [0, 50, 100]) {
+        const y = eyOf(pct).toFixed(1);
+        svg.push(`<line x1="${eL}" y1="${y}" x2="${eW - eR}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`);
+        svg.push(`<text x="${eL - 5}" y="${(+y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${pct}</text>`);
+      }
+      for (const w of medConfig.weeks) {
+        svg.push(`<text x="${exOf(w).toFixed(1)}" y="${eH - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${w}</text>`);
+      }
+      // onset / stabilize guides
+      for (const g of [acc.onsetWeeks, acc.stabilizeWeeks]) {
+        svg.push(`<line x1="${exOf(g).toFixed(1)}" y1="${eT}" x2="${exOf(g).toFixed(1)}" y2="${eT + epH}" stroke="var(--line)" stroke-dasharray="3 3" stroke-width="1"/>`);
+      }
+      const linePath = series
+        .map((s, i) => `${i === 0 ? "M" : "L"}${exOf(s.week).toFixed(1)} ${eyOf(s.percent).toFixed(1)}`)
+        .join(" ");
+      const x0 = exOf(0).toFixed(1), xN = exOf(endW).toFixed(1), yB = eyOf(0).toFixed(1);
+      svg.push(`<path d="${linePath} L${xN} ${yB} L${x0} ${yB} Z" fill="var(--accent-soft)"/>`);
+      svg.push(`<path d="${linePath}" fill="none" stroke="var(--er)" stroke-width="2.4" stroke-linejoin="round"/>`);
+
+      const nowPct = effectAccrualFraction(week, acc) * 100;
+      svg.push(`<line x1="${exOf(week).toFixed(1)}" y1="${eT}" x2="${exOf(week).toFixed(1)}" y2="${eT + epH}" stroke="var(--accent)" stroke-width="1.5"/>`);
+      svg.push(`<circle cx="${exOf(week).toFixed(1)}" cy="${eyOf(nowPct).toFixed(1)}" r="3.6" fill="var(--accent)" stroke="var(--surface)" stroke-width="1.5"/>`);
+      effectChart.innerHTML = svg.join("");
+
+      document.getElementById("chipOnset").innerHTML = `${acc.onsetWeeks}<span class="unit"> 주</span>`;
+      document.getElementById("chipStabilize").innerHTML = `${acc.stabilizeWeeks}<span class="unit"> 주</span>`;
+      document.getElementById("chipNow").innerHTML = `${nowPct.toFixed(0)}<span class="unit"> %</span>`;
+    }
+
+    function render() {
+      const accum = isAccum();
+      document.getElementById("effectCard").hidden = !accum;
+      document.getElementById("weeksCard").hidden = !accum;
+      document.getElementById("doseCard").hidden = accum;
+      document.getElementById("chartChips").style.display = accum ? "none" : "";
+      document.getElementById("chartTitle").textContent = accum ? "정상상태 일일 농도 (정규화)" : "혈중 농도 추정";
+
+      const note = document.getElementById("chartNote");
+      note.hidden = !accum;
+      if (accum) note.innerHTML = "매일 복용해 농도가 안정된 뒤의 하루 패턴(피크 대비 %)입니다. 이 일일 곡선은 <strong>효과의 세기를 나타내지 않습니다</strong> — 효과는 위 누적 경과를 보세요.";
+
+      if (accum) renderEffect();
+      renderDailyCurve();
+
       document.getElementById("medName").textContent = `${profile.brandName} 농도`;
       document.getElementById("medGeneric").textContent =
         `${profile.displayName} · ${profile.genericName} · 교육용 추정 · 의료 조언 아님`;
@@ -274,9 +373,9 @@
       medConfig = DEMO_MEDS.find((m) => m.id === id);
       profile = profiles[medConfig.id];
       dose = medConfig.defaultDose;
+      week = medConfig.defaultWeek ?? 0;
       showComponents = false;
       document.getElementById("compToggle").checked = false;
-      recomputeYMax();
       renderSegments();
       render();
     }
@@ -290,6 +389,13 @@
       if (!btn) return;
       dose = Number(btn.dataset.dose);
       doseSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    weekSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-week]");
+      if (!btn) return;
+      week = Number(btn.dataset.week);
+      weekSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
       render();
     });
     document.getElementById("compToggle").addEventListener("change", (e) => {
@@ -308,13 +414,7 @@
 
     // Init (optional ?med=<id> deep link for previews)
     const requested = new URLSearchParams(location.search).get("med");
-    if (requested && DEMO_MEDS.some((m) => m.id === requested)) {
-      selectMed(requested);
-    } else {
-      recomputeYMax();
-      renderSegments();
-      render();
-    }
+    selectMed(requested && DEMO_MEDS.some((m) => m.id === requested) ? requested : DEMO_MEDS[0].id);
   </script>
 </body>
 </html>

@@ -19,6 +19,9 @@
 
 * { box-sizing: border-box; }
 
+/* The [hidden] attribute must win over class display rules (e.g. .controls). */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   background: var(--bg);
@@ -100,6 +103,13 @@ html, body {
 }
 
 /* Chips */
+.note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
 .chips {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

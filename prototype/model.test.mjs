@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getProfile, concertaOros, methylphenidateIr, medikinetRetard } from "./pk-profiles.js";
+import { getProfile, concertaOros, methylphenidateIr, medikinetRetard, atomoxetine } from "./pk-profiles.js";
 import { createDoseEvent, expandSchedule, activeDoseEvents } from "./dose-events.js";
 import { buildConcentrationSeries } from "./concentration-series.js";
+import { effectAccrualFraction, buildEffectAccrualSeries } from "./effect-model.js";
 
 const grid = { startHour: 0, endHour: 30, stepMinutes: 1 };
 
@@ -82,7 +83,50 @@ test("getProfile returns the registered profile and throws on unknown", () => {
   assert.equal(getProfile("concerta-oros").id, "concerta-oros");
   assert.equal(getProfile("methylphenidate-ir").id, "methylphenidate-ir");
   assert.equal(getProfile("methylphenidate-medikinet").id, "methylphenidate-medikinet");
+  assert.equal(getProfile("atomoxetine").id, "atomoxetine");
   assert.throws(() => getProfile("nope"));
+});
+
+test("modelKind classifies stimulants vs accumulation drugs", () => {
+  assert.equal(concertaOros.modelKind, "same-day-curve");
+  assert.equal(methylphenidateIr.modelKind, "same-day-curve");
+  assert.equal(medikinetRetard.modelKind, "same-day-curve");
+  assert.equal(atomoxetine.modelKind, "accumulation");
+});
+
+test("effectAccrualFraction is monotonic, 0 at week 0, ~25%/90% at onset/stabilize", () => {
+  const accrual = { onsetWeeks: 2, stabilizeWeeks: 6 };
+  assert.equal(effectAccrualFraction(0, accrual), 0);
+  assert.ok(Math.abs(effectAccrualFraction(2, accrual) - 0.25) < 0.02, "onset ~25%");
+  assert.ok(Math.abs(effectAccrualFraction(6, accrual) - 0.9) < 0.02, "stabilize ~90%");
+  let prev = -1;
+  for (let w = 0; w <= 12; w += 0.5) {
+    const f = effectAccrualFraction(w, accrual);
+    assert.ok(f >= prev - 1e-9, `monotonic at week ${w}`);
+    assert.ok(f >= 0 && f <= 1, `bounded at week ${w}`);
+    prev = f;
+  }
+  assert.throws(() => effectAccrualFraction(1, { onsetWeeks: 6, stabilizeWeeks: 2 }));
+});
+
+test("buildEffectAccrualSeries spans 0..endWeeks rising to near full effect", () => {
+  const series = buildEffectAccrualSeries({ effectAccrual: atomoxetine.effectAccrual, endWeeks: 10 });
+  assert.equal(series[0].week, 0);
+  assert.equal(series[0].percent, 0);
+  assert.equal(series[series.length - 1].week, 10);
+  assert.ok(series[series.length - 1].percent > 90, "near full effect by 10 weeks");
+  // stabilizeWeeks anchor (~90%)
+  const atStabilize = series.find((s) => Math.abs(s.week - atomoxetine.effectAccrual.stabilizeWeeks) < 1e-9);
+  assert.ok(Math.abs(atStabilize.percent - 90) < 2, `~90% at stabilize, got ${atStabilize.percent}`);
+});
+
+test("atomoxetine steady-state daily curve is single-peak near Tmax 1.5 h", () => {
+  const { stats } = buildConcentrationSeries({
+    profile: atomoxetine,
+    doseEvents: [createDoseEvent({ medicationId: atomoxetine.id, amountMg: 40, takenAtHour: 0 })],
+    grid: { startHour: 0, endHour: 24, stepMinutes: 1 },
+  });
+  assert.ok(Math.abs(stats.tmaxHour - 1.5) <= 0.4, `tmax=${stats.tmaxHour}`);
 });
 
 test("Medikinet retard reproduces SmPC Cmax / Tmax (20 mg)", () => {

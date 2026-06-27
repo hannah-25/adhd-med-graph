@@ -43,6 +43,7 @@ Package: `adhd-med-graph`
 - `docs/engineering/testing-strategy.md`
 - `docs/exec-plans/active/.gitkeep`
 - `docs/exec-plans/completed/.gitkeep`
+- `docs/exec-plans/completed/atomoxetine-steady-state.md`
 - `docs/exec-plans/tech-debt-tracker.md`
 - `docs/exec-plans/template.md`
 - `docs/generated/api-index.md`
@@ -51,6 +52,7 @@ Package: `adhd-med-graph`
 - `docs/generated/project-map.md`
 - `docs/harness-change-summary.md`
 - `docs/implementation-plan.md`
+- `docs/product/atomoxetine-reference.md`
 - `docs/product/concerta-pk-reference.md`
 - `docs/product/domain-overview.md`
 - `docs/product/index.md`
@@ -64,6 +66,7 @@ Package: `adhd-med-graph`
 - `prototype/concentration-demo.html`
 - `prototype/concentration-series.js`
 - `prototype/dose-events.js`
+- `prototype/effect-model.js`
 - `prototype/model.test.mjs`
 - `prototype/pharmacokinetics.js`
 - `prototype/pk-profiles.js`

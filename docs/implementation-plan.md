@@ -73,9 +73,9 @@ prototype/concentration-demo.html
 - [~] MPH · 서방캡슐 beads (메타데이트 CD) — **제외**: 국내 공급 중단(2019). 기본 선택지 부적절.
 - [x] MPH · 서방캡슐 (메디키넷 리타드) — `methylphenidate-medikinet`. EU SmPC 기준(50% IR + 50% ER, Cmax 6.4 @2.75h, AUC 48.9, t½ 3.2h), IR 피크 + 3~4h 플래토
 - [~] MPH · 조절방출캡슐 (비스펜틴) — **제외**: 국내 미사용.
-- [ ] atomoxetine · 캡슐 (스트라테라 외 국내 6종 = 동일 프로필 1개) — 누적형 → 별도 정상상태(steady-state) 표현 ([attune-porting-spec.md](attune-porting-spec.md) §9)
+- [x] atomoxetine · 캡슐 (스트라테라 외 국내 6종 = 동일 프로필 1개) — `atomoxetine`. 누적형: 효과 누적 진행(주 단위) + 정상상태 일일 곡선(정규화) 2-카드 표현. `effect-model.js` 신규. ([attune-porting-spec.md](attune-porting-spec.md) §9)
 
-국내 자극제(MPH) 곡선은 **콘서타·페니드·메디키넷 3종으로 완료**다(메타데이트 CD·비스펜틴은 국내 미사용으로 제외). 남은 국내 약물은 atomoxetine 1개이며, 누적형이라 당일 곡선이 아닌 정상상태 표현을 별도로 설계한다.
+국내 자극제(MPH) 곡선은 **콘서타·페니드·메디키넷 3종으로 완료**(메타데이트 CD·비스펜틴은 국내 미사용으로 제외). atomoxetine까지 완료되어 **국내 ADHD 약 프로필이 모두 갖춰졌다**.
 
 ### 우선순위 2 — 해외 (확장 시)
 

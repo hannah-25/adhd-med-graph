@@ -17,6 +17,7 @@ export const concertaOros = {
   displayName: "콘서타 서방정",
   genericName: "methylphenidate",
   releaseProfile: "oros-dual",
+  modelKind: "same-day-curve",
   halfLifeHours: 3.5,
 
   // Display/effect annotations (educational chips).
@@ -69,6 +70,7 @@ export const methylphenidateIr = {
   displayName: "메틸페니데이트 속방정",
   genericName: "methylphenidate",
   releaseProfile: "immediate",
+  modelKind: "same-day-curve",
   halfLifeHours: 3.0, // FDA IR label
 
   peakTimeHours: 1.5,
@@ -113,6 +115,7 @@ export const medikinetRetard = {
   displayName: "메디키넷 리타드",
   genericName: "methylphenidate",
   releaseProfile: "er-capsule",
+  modelKind: "same-day-curve",
   halfLifeHours: 3.2,
 
   peakTimeHours: 2.75,
@@ -144,10 +147,74 @@ export const medikinetRetard = {
   ],
 };
 
+// Atomoxetine (스트라테라 외 국내 6종 = 동일 프로필) — non-stimulant NRI.
+// Accumulation type: blood level reaches steady state within days, but the
+// CLINICAL EFFECT builds over weeks. So we do not draw a single same-day curve;
+// see docs/exec-plans + the demo's accumulation view (effect timeline + a
+// normalized steady-state daily curve).
+//
+// PK for the daily curve (FDA Strattera label, extensive metabolizers):
+//   Tmax 1–2 h, half-life 5.2 h (EM) / 21.6 h (poor metabolizers, CYP2D6).
+// The daily curve is shown normalized (% of peak); see the exec-plan decision
+// log — the label does not give a clean absolute Cmax/AUC to anchor ng/mL.
+export const atomoxetine = {
+  id: "atomoxetine",
+  brandName: "스트라테라", // 상품명 (국내 대표; 동일 성분 6종 더 있음)
+  displayName: "아토목세틴 캡슐",
+  genericName: "atomoxetine",
+  drugClass: "non-stimulant",
+  releaseProfile: "immediate",
+  modelKind: "accumulation",
+  halfLifeHours: 5.2, // EM mean; PM ~21.6 h (see metabolismNote)
+
+  peakTimeHours: 1.5,
+  // Clinical effect time-course. The FDA label's Clinical Studies section grounds
+  // the timescale: ADHD efficacy trials ran 6–10 weeks and significant separation
+  // from placebo was shown by ~8 weeks. The exact accrual SHAPE is illustrative
+  // (the label gives no week-by-week effect curve); onsetWeeks is an estimate.
+  effectAccrual: { onsetWeeks: 2, stabilizeWeeks: 8 },
+
+  release: {
+    irFraction: 1.0,
+    ir: { rate: 1.9 }, // Tmax ~1.5 h
+    er: { tLagHours: 0, scaleHours: 1, shape: 1 },
+  },
+
+  // Nominal reference — the daily curve is displayed normalized (%), so the
+  // absolute scale is not used for atomoxetine.
+  reference: {
+    calibrationDoseMg: 40,
+    cmaxNgPerMl: null,
+    tmaxHours: 1.5,
+    aucNgHPerMl: 100, // nominal; normalized display only
+  },
+
+  metabolismNote:
+    "CYP2D6 저대사자(PM)는 반감기 ~21.6h로 노출이 크게 증가한다(EM ~5.2h).",
+
+  evidence: [
+    {
+      source: "Strattera (atomoxetine) FDA label — Pharmacokinetics",
+      url: "https://dailymed.nlm.nih.gov/dailymed/fda/fdaDrugXsl.cfm?setid=309de576-c318-404a-bc15-660c2b1876fb",
+      type: "regulatory-label",
+      confidence: "high",
+      note: "Tmax 1–2 h; half-life 5.2 h (EM) / 21.6 h (PM); F 63%/94%; CYP2D6. 라벨에 단일용량 Cmax/AUC 절대값 없음(전체 라벨 확인) → 일일 곡선은 정규화 표시.",
+    },
+    {
+      source: "Strattera FDA label — Clinical Studies (ADHD 효능 시험)",
+      url: "https://dailymed.nlm.nih.gov/dailymed/fda/fdaDrugXsl.cfm?setid=309de576-c318-404a-bc15-660c2b1876fb",
+      type: "regulatory-label",
+      confidence: "medium",
+      note: "효능 시험 6~10주; 위약 대비 유의한 개선이 ~8주까지 확인. 누적 곡선의 정확한 모양은 교육용 예시(라벨이 주별 효과 곡선을 주지 않음).",
+    },
+  ],
+};
+
 export const profiles = {
   [concertaOros.id]: concertaOros,
   [methylphenidateIr.id]: methylphenidateIr,
   [medikinetRetard.id]: medikinetRetard,
+  [atomoxetine.id]: atomoxetine,
 };
 
 export function getProfile(medicationId) {
