@@ -44,6 +44,7 @@ Package: `adhd-med-graph`
 - `docs/exec-plans/active/.gitkeep`
 - `docs/exec-plans/completed/.gitkeep`
 - `docs/exec-plans/completed/atomoxetine-steady-state.md`
+- `docs/exec-plans/completed/medication-evidence-display.md`
 - `docs/exec-plans/tech-debt-tracker.md`
 - `docs/exec-plans/template.md`
 - `docs/generated/api-index.md`
@@ -58,6 +59,7 @@ Package: `adhd-med-graph`
 - `docs/product/index.md`
 - `docs/product/methylphenidate-ir-reference.md`
 - `docs/product/methylphenidate-medikinet-reference.md`
+- `docs/product/pk-model-principles.md`
 - `docs/quality/maintainability.md`
 - `docs/quality/quality-score.md`
 - `docs/quality/reliability.md`

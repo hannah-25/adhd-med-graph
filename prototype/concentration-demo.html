@@ -52,11 +52,20 @@
 
       <div class="chart-wrap">
         <svg class="chart" id="chart" viewBox="0 0 360 200" role="img"
-             aria-label="시간에 따른 혈중 농도 추정 곡선"></svg>
+             aria-label="시간에 따른 혈중 농도 추정 곡선" tabindex="0"></svg>
+        <div class="chart-hover" id="chartHover" aria-hidden="true">
+          <span class="chart-hover-label">경과 시간</span>
+          <span class="chart-hover-time" id="chartHoverTime"></span>
+          <span class="chart-hover-clock" id="chartHoverClock"></span>
+          <span class="chart-hover-value" id="chartHoverValue"></span>
+          <span class="chart-hover-effect" id="chartHoverEffect"></span>
+        </div>
       </div>
 
       <div class="chart-legend" id="legend">
         <span><span class="swatch" style="background:var(--accent)"></span>전체</span>
+        <span class="now-only"><span class="swatch swatch-line" style="background:var(--now)"></span>복용 후 지금</span>
+        <span class="multi-dose-only"><span class="swatch swatch-line" style="background:var(--text-dim)"></span>단일 복용 비교</span>
         <span class="effect-only"><span class="swatch" style="background:var(--effect-band);border:1px dashed var(--effect-edge)"></span>작용 구간(임상 작용시간)</span>
         <span class="comp-only"><span class="swatch" style="background:var(--ir)"></span>즉시방출(IR)</span>
         <span class="comp-only"><span class="swatch" style="background:var(--er)"></span>서방형(ER)</span>
@@ -84,6 +93,20 @@
       <div class="control-row">
         <span>용량</span>
         <div class="seg" id="doseSeg" role="group" aria-label="용량 선택"></div>
+      </div>
+      <div class="control-row">
+        <label for="doseTime">복용 시간</label>
+        <input class="time-input" type="time" id="doseTime" value="08:00" />
+      </div>
+      <div class="control-row">
+        <label class="toggle">
+          <input type="checkbox" id="secondDoseToggle" />
+          오후 추가 복용 누적 보기
+        </label>
+      </div>
+      <div class="control-row" id="secondDoseRow" hidden>
+        <label for="secondDoseTime">추가 복용 시간</label>
+        <input class="time-input" type="time" id="secondDoseTime" value="14:00" />
       </div>
       <div class="control-row" id="compRow">
         <label class="toggle">
@@ -203,10 +226,10 @@
 
     const xOf = (h) => padL + (h / grid.endHour) * plotW;
 
-    function seriesFor(profile, amountMg) {
+    function seriesFor(profile, amountMg, doseEvents = null) {
       return buildConcentrationSeries({
         profile,
-        doseEvents: [createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: 0 })],
+        doseEvents: doseEvents ?? [createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: 0 })],
         grid,
       });
     }
@@ -220,10 +243,19 @@
     }
 
     const chart = document.getElementById("chart");
+    const chartHover = document.getElementById("chartHover");
+    const chartHoverTime = document.getElementById("chartHoverTime");
+    const chartHoverClock = document.getElementById("chartHoverClock");
+    const chartHoverValue = document.getElementById("chartHoverValue");
+    const chartHoverEffect = document.getElementById("chartHoverEffect");
     const effectChart = document.getElementById("effectChart");
     const medSeg = document.getElementById("medSeg");
     const doseSeg = document.getElementById("doseSeg");
     const weekSeg = document.getElementById("weekSeg");
+    const doseTimeInput = document.getElementById("doseTime");
+    const secondDoseToggle = document.getElementById("secondDoseToggle");
+    const secondDoseRow = document.getElementById("secondDoseRow");
+    const secondDoseTimeInput = document.getElementById("secondDoseTime");
 
     let medConfig = DEMO_MEDS[0];
     let profile = profiles[medConfig.id];
@@ -231,6 +263,10 @@
     let week = medConfig.defaultWeek ?? 0;
     let yMax = 1;
     let showComponents = false;
+    let currentSeries = [];     // daily-curve series for hover lookup
+    let currentNormalized = false;
+    let selectedHour = null;
+    let secondDoseEnabled = false;
 
     const isAccum = () => profile.modelKind === "accumulation";
     const hasErStage = () => profile.release.irFraction < 1;
@@ -238,6 +274,7 @@
     const yOf = (v) => padT + plotH - (v / yMax) * plotH;
     // value accessor: normalized (%) for accumulation meds, else raw ng/mL
     const dv = (p) => (isAccum() ? p.percent : p.raw);
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
     function pathFrom(points) {
       return points
@@ -249,6 +286,64 @@
       const xN = xOf(points[points.length - 1].hour).toFixed(1);
       const yBase = yOf(0).toFixed(1);
       return `${pathFrom(points)} L${xN} ${yBase} L${x0} ${yBase} Z`;
+    }
+
+    function parseClockMinutes(value) {
+      const [h, m] = String(value || "08:00").split(":").map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return 8 * 60;
+      return clamp(h * 60 + m, 0, 1439);
+    }
+
+    function formatClockMinutes(minutes) {
+      const normalized = ((Math.round(minutes) % 1440) + 1440) % 1440;
+      const h = Math.floor(normalized / 60);
+      const m = normalized % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
+    function clockForHour(hour) {
+      return formatClockMinutes(parseClockMinutes(doseTimeInput.value) + hour * 60);
+    }
+
+    function elapsedNowHour() {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const doseMinutes = parseClockMinutes(doseTimeInput.value);
+      const elapsedMinutes = (nowMinutes - doseMinutes + 1440) % 1440;
+      return elapsedMinutes / 60;
+    }
+
+    function secondDoseOffsetHour() {
+      const first = parseClockMinutes(doseTimeInput.value);
+      const second = parseClockMinutes(secondDoseTimeInput.value);
+      return ((second - first + 1440) % 1440) / 60;
+    }
+
+    function doseEventsFor(amountMg, includeSecondDose = secondDoseEnabled) {
+      const events = [createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: 0 })];
+      const secondHour = secondDoseOffsetHour();
+      if (!isAccum() && includeSecondDose && secondHour > 0 && secondHour <= grid.endHour) {
+        events.push(createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: secondHour }));
+      }
+      return events;
+    }
+
+    function effectWindows() {
+      if (!Number.isFinite(profile.effectStartHours) || !Number.isFinite(profile.effectEndHours)) return [];
+      return doseEventsFor(dose)
+        .map((event) => ({
+          start: event.takenAtHour + profile.effectStartHours,
+          end: event.takenAtHour + profile.effectEndHours,
+        }))
+        .filter((window) => window.start < grid.endHour && window.end > grid.startHour);
+    }
+
+    function effectStatusForHour(hour) {
+      const windows = effectWindows();
+      if (!windows.length) return "";
+      return windows.some((window) => hour >= window.start && hour <= window.end)
+        ? "예상 작용 구간 안"
+        : "예상 작용 구간 밖";
     }
 
     function renderSegments() {
@@ -267,8 +362,12 @@
     // ----- daily concentration curve (chart card) -----
     function renderDailyCurve() {
       const normalized = isAccum();
-      const { series, components, stats } = seriesFor(profile, dose);
-      yMax = normalized ? 108 : seriesFor(profile, Math.max(...medConfig.doses)).stats.cmaxRaw * 1.1;
+      const primary = seriesFor(profile, dose, doseEventsFor(dose, false));
+      const { series, components, stats } = seriesFor(profile, dose, doseEventsFor(dose));
+      const maxDose = seriesFor(profile, Math.max(...medConfig.doses), doseEventsFor(Math.max(...medConfig.doses)));
+      yMax = normalized ? 108 : Math.max(stats.cmaxRaw, maxDose.stats.cmaxRaw) * 1.1;
+      currentSeries = series;
+      currentNormalized = normalized;
       const firstPeak = findFirstPeak(series);
       const svg = [];
 
@@ -279,15 +378,16 @@
         svg.push(`<text x="${padL - 5}" y="${(+y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${normalized ? Math.round((v / yMax) * 100) : v.toFixed(1)}</text>`);
       }
       for (const h of [0, 4, 8, 12, 16, 20, 24]) {
-        svg.push(`<text x="${xOf(h).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${h}</text>`);
+        svg.push(`<text x="${xOf(h).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${clockForHour(h)}</text>`);
       }
 
       // Effect window (작용 구간): a distinct amber band with dashed edges, drawn
       // only when the profile defines one (accumulation meds have none).
-      const hasWindow = Number.isFinite(profile.effectStartHours) && Number.isFinite(profile.effectEndHours);
-      if (hasWindow) {
-        const ex0 = xOf(profile.effectStartHours);
-        const ex1 = xOf(Math.min(profile.effectEndHours, grid.endHour));
+      const windows = effectWindows();
+      const hasWindow = windows.length > 0;
+      for (const window of windows) {
+        const ex0 = xOf(Math.max(window.start, grid.startHour));
+        const ex1 = xOf(Math.min(window.end, grid.endHour));
         svg.push(`<rect x="${ex0.toFixed(1)}" y="${padT}" width="${(ex1 - ex0).toFixed(1)}" height="${plotH}" fill="var(--effect-band)"/>`);
         for (const ex of [ex0, ex1]) {
           svg.push(`<line x1="${ex.toFixed(1)}" y1="${padT}" x2="${ex.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="var(--effect-edge)" stroke-dasharray="3 3" stroke-width="1"/>`);
@@ -296,6 +396,9 @@
       document.querySelectorAll(".effect-only").forEach((el) => { el.style.display = hasWindow ? "" : "none"; });
 
       svg.push(`<path d="${areaFrom(series)}" fill="var(--accent-soft)"/>`);
+      if (secondDoseEnabled && !normalized) {
+        svg.push(`<path d="${pathFrom(primary.series)}" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.85"/>`);
+      }
       svg.push(`<path d="${pathFrom(series)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`);
 
       if (showComponents && hasErStage()) {
@@ -313,8 +416,24 @@
       for (const m of markers) {
         svg.push(`<circle cx="${xOf(m.p.hour).toFixed(1)}" cy="${yOf(m.p.v).toFixed(1)}" r="3.2" fill="${m.color}" stroke="var(--surface)" stroke-width="1.5"/>`);
       }
+      svg.push(`<g id="chartHoverGuide" class="hover-guide" hidden>
+        <line id="chartHoverLine" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT + plotH).toFixed(1)}"/>
+        <circle id="chartHoverDot" cx="${padL}" cy="${yOf(0).toFixed(1)}" r="4"/>
+      </g>`);
+      svg.push(`<g id="chartSelectedGuide" class="selected-guide" hidden>
+        <line id="chartSelectedLine" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT + plotH).toFixed(1)}"/>
+        <circle id="chartSelectedDot" cx="${padL}" cy="${yOf(0).toFixed(1)}" r="5"/>
+      </g>`);
+      svg.push(`<g id="chartNowGuide" class="now-guide" hidden>
+        <line id="chartNowLine" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT + plotH).toFixed(1)}"/>
+        <circle id="chartNowDot" cx="${padL}" cy="${yOf(0).toFixed(1)}" r="4.5"/>
+        <text id="chartNowLabel" x="${padL}" y="${padT + 10}" text-anchor="middle">지금</text>
+      </g>`);
 
       chart.innerHTML = svg.join("");
+      hideChartHover();
+      renderSelectedGuide();
+      renderNowGuide();
 
       // chips (hidden for accumulation; see render())
       const hasDistinctFirstPeak = hasErStage() && stats.tmaxHour - firstPeak.hour > 0.5;
@@ -324,6 +443,12 @@
       document.getElementById("chipEnd").innerHTML = `${profile.effectEndHours}<span class="unit"> h</span>`;
       document.querySelectorAll(".comp-only").forEach((el) => {
         el.style.display = showComponents && hasErStage() ? "" : "none";
+      });
+      document.querySelectorAll(".multi-dose-only").forEach((el) => {
+        el.style.display = secondDoseEnabled && !normalized ? "" : "none";
+      });
+      document.querySelectorAll(".now-only").forEach((el) => {
+        el.style.display = normalized ? "none" : "";
       });
     }
 
@@ -437,6 +562,7 @@
       document.getElementById("effectCard").hidden = !accum;
       document.getElementById("weeksCard").hidden = !accum;
       document.getElementById("doseCard").hidden = accum;
+      secondDoseRow.hidden = accum || !secondDoseEnabled;
       document.getElementById("chartChips").style.display = accum ? "none" : "";
       document.getElementById("chartTitle").textContent = accum ? "정상상태 일일 농도 (정규화)" : "혈중 농도 추정";
 
@@ -488,6 +614,122 @@
       showComponents = e.target.checked;
       render();
     });
+    doseTimeInput.addEventListener("input", render);
+    secondDoseTimeInput.addEventListener("input", render);
+    secondDoseToggle.addEventListener("change", (e) => {
+      secondDoseEnabled = e.target.checked;
+      render();
+    });
+
+    function formatElapsedHours(hour) {
+      const rounded = Math.round(hour * 10) / 10;
+      if (rounded === 0) return "복용 직후";
+      if (rounded < 1) return `${Math.round(rounded * 60)}분 경과`;
+      return `${rounded.toFixed(Number.isInteger(rounded) ? 0 : 1)}시간 경과`;
+    }
+
+    function nearestPointForClientX(clientX) {
+      if (!currentSeries.length) return null;
+      const rect = chart.getBoundingClientRect();
+      if (rect.width <= 0) return null;
+      const svgX = ((clientX - rect.left) / rect.width) * W;
+      const hour = clamp(((svgX - padL) / plotW) * grid.endHour, grid.startHour, grid.endHour);
+      return nearestPointForHour(hour);
+    }
+
+    function nearestPointForHour(hour) {
+      if (!currentSeries.length) return null;
+      return currentSeries.reduce((nearest, point) => (
+        Math.abs(point.hour - hour) < Math.abs(nearest.hour - hour) ? point : nearest
+      ), currentSeries[0]);
+    }
+
+    function setGuidePoint(prefix, point) {
+      const x = xOf(point.hour);
+      const y = yOf(dv(point));
+      const guide = document.getElementById(`chart${prefix}Guide`);
+      const guideLine = document.getElementById(`chart${prefix}Line`);
+      const guideDot = document.getElementById(`chart${prefix}Dot`);
+
+      if (guide && guideLine && guideDot) {
+        guide.removeAttribute("hidden");
+        guideLine.setAttribute("x1", x.toFixed(1));
+        guideLine.setAttribute("x2", x.toFixed(1));
+        guideDot.setAttribute("cx", x.toFixed(1));
+        guideDot.setAttribute("cy", y.toFixed(1));
+      }
+      return { x, y };
+    }
+
+    function showChartHover(point) {
+      const { x, y } = setGuidePoint("Hover", point);
+
+      chartHoverTime.textContent = formatElapsedHours(point.hour);
+      chartHoverClock.textContent = clockForHour(point.hour);
+      chartHoverValue.textContent = currentNormalized
+        ? `피크 대비 ${point.percent.toFixed(0)}%`
+        : `추정 농도 ${point.raw.toFixed(1)} ng/mL`;
+      chartHoverEffect.textContent = effectStatusForHour(point.hour);
+      chartHover.style.left = `${clamp((x / W) * 100, 14, 86)}%`;
+      chartHover.style.top = `${clamp((y / H) * 100, 22, 92)}%`;
+      chartHover.classList.add("visible");
+      chartHover.setAttribute("aria-hidden", "false");
+    }
+
+    function hideChartHover() {
+      chartHover.classList.remove("visible");
+      chartHover.setAttribute("aria-hidden", "true");
+      const guide = document.getElementById("chartHoverGuide");
+      if (guide) guide.setAttribute("hidden", "");
+    }
+
+    function selectChartPoint(point) {
+      selectedHour = point.hour;
+      setGuidePoint("Selected", point);
+    }
+
+    function renderSelectedGuide() {
+      const guide = document.getElementById("chartSelectedGuide");
+      if (!guide) return;
+      if (selectedHour == null) {
+        guide.setAttribute("hidden", "");
+        return;
+      }
+      const point = nearestPointForHour(selectedHour);
+      if (point) setGuidePoint("Selected", point);
+    }
+
+    function renderNowGuide() {
+      const guide = document.getElementById("chartNowGuide");
+      const label = document.getElementById("chartNowLabel");
+      if (!guide || isAccum()) return;
+      const point = nearestPointForHour(elapsedNowHour());
+      if (!point) {
+        guide.setAttribute("hidden", "");
+        return;
+      }
+      const { x } = setGuidePoint("Now", point);
+      if (label) label.setAttribute("x", x.toFixed(1));
+    }
+
+    chart.addEventListener("pointermove", (e) => {
+      const point = nearestPointForClientX(e.clientX);
+      if (point) showChartHover(point);
+    });
+    chart.addEventListener("pointerdown", (e) => {
+      const point = nearestPointForClientX(e.clientX);
+      if (!point) return;
+      selectChartPoint(point);
+      showChartHover(point);
+    });
+    chart.addEventListener("pointerleave", hideChartHover);
+    chart.addEventListener("pointercancel", hideChartHover);
+    chart.addEventListener("focus", () => {
+      if (!currentSeries.length) return;
+      showChartHover(currentSeries.reduce((peak, point) => dv(point) > dv(peak) ? point : peak, currentSeries[0]));
+    });
+    chart.addEventListener("blur", hideChartHover);
+    setInterval(renderNowGuide, 60 * 1000);
 
     // Init (optional ?med=<id> deep link for previews)
     const requested = new URLSearchParams(location.search).get("med");
