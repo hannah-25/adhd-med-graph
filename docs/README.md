@@ -6,6 +6,7 @@ This directory is the project knowledge store. Keep `AGENTS.md` short and link h
 
 - [product/index.md](product/index.md): product documentation index.
 - [product/domain-overview.md](product/domain-overview.md): medication graph domain model and safety boundary.
+- [product/pk-model-principles.md](product/pk-model-principles.md): canonical PK model design principles (sourcing, model, axis, limitations).
 - [product/concerta-pk-reference.md](product/concerta-pk-reference.md): Concerta PK reference data (FDA label + PLOS One Weibull model).
 - [product/methylphenidate-ir-reference.md](product/methylphenidate-ir-reference.md): IR methylphenidate PK reference data (Ritalin FDA label + adult PK study).
 - [product/methylphenidate-medikinet-reference.md](product/methylphenidate-medikinet-reference.md): Medikinet retard PK reference data (EU SmPC).

@@ -1,6 +1,6 @@
 # Atomoxetine PK Reference (근거 자료)
 
-아토목세틴(스트라테라 외 국내 6종 = 동일 프로필) 표현 근거 자료입니다. 비자극제(NRI)이며 **누적형(accumulation)** 으로, 당일 단일 곡선 대신 ① 효과 누적 진행 + ② 정상상태 일일 곡선으로 표현합니다([데이터 출처 정책](concerta-pk-reference.md#데이터-출처-정책-2026-06-27), 설계: [atomoxetine-steady-state](../exec-plans/completed/atomoxetine-steady-state.md)).
+아토목세틴(스트라테라 외 국내 6종 = 동일 프로필) 표현 근거 자료입니다. 비자극제(NRI)이며 **누적형(accumulation)** 으로, 당일 단일 곡선 대신 ① 효과 누적 진행 + ② 정상상태 일일 곡선으로 표현합니다([PK 모델 설계 원칙](pk-model-principles.md), 설계: [atomoxetine-steady-state](../exec-plans/completed/atomoxetine-steady-state.md)).
 
 > 안전 경계: 성인 평균/임상 경과 기반 추정. 교육용이며 의료 조언이 아닙니다. 효과가 느려도 임의 중단 금지, 의료진과 상의.
 

@@ -1,6 +1,6 @@
 # IR Methylphenidate PK Reference (근거 자료)
 
-속방형 메틸페니데이트(immediate-release, 예: Ritalin / 페니드 속방정) 농도 곡선 근거 자료입니다. 검증 수치는 **FDA 승인 라벨만** 사용합니다([데이터 출처 정책](concerta-pk-reference.md#데이터-출처-정책-2026-06-27) 참고).
+속방형 메틸페니데이트(immediate-release, 예: Ritalin / 페니드 속방정) 농도 곡선 근거 자료입니다. 검증 수치는 **FDA 승인 라벨만** 사용합니다([PK 모델 설계 원칙](pk-model-principles.md) 참고).
 
 > 안전 경계: 성인 평균 추정치. 교육용이며 의료 조언이 아닙니다. 실제 농도·반응은 개인차가 큽니다.
 

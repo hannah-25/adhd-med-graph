@@ -6,6 +6,9 @@
 //   release.ir.rate            first-order IR release rate (per hour)
 //   release.er { tLagHours, scaleHours, shape }  Weibull ER release
 //   reference.calibrationDoseMg / cmaxNgPerMl / aucNgHPerMl / tmaxHours
+//   effectStartHours / effectEndHours  임상 작용시간(duration of action) 추정.
+//     농도 임계가 아니라 라벨/복용횟수 근거 (자극제 효과 ≠ 농도임계, 상승국면 연동).
+//     출처·근거는 docs/product/pk-model-principles.md "작용시간" 표 참고.
 //
 // Calibration targets come from the 18 mg adult-mean data. The free shape
 // parameters are tuned to reproduce Tmax and Cmax; the elimination half-life

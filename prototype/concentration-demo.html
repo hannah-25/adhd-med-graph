@@ -48,7 +48,6 @@
     <section class="card">
       <div class="card-head">
         <h2 id="chartTitle">혈중 농도 추정</h2>
-        <button class="icon-btn" id="infoBtn" aria-label="그래프 설명 열기">ℹ</button>
       </div>
 
       <div class="chart-wrap">
@@ -58,6 +57,7 @@
 
       <div class="chart-legend" id="legend">
         <span><span class="swatch" style="background:var(--accent)"></span>전체</span>
+        <span class="effect-only"><span class="swatch" style="background:var(--effect-band);border:1px dashed var(--effect-edge)"></span>작용 구간(임상 작용시간)</span>
         <span class="comp-only"><span class="swatch" style="background:var(--ir)"></span>즉시방출(IR)</span>
         <span class="comp-only"><span class="swatch" style="background:var(--er)"></span>서방형(ER)</span>
       </div>
@@ -93,6 +93,25 @@
       </div>
     </section>
 
+    <!-- Explanation -->
+    <section class="card">
+      <div class="card-head"><h2>이 약은?</h2></div>
+      <div id="explainBody" class="explain"></div>
+    </section>
+
+    <!-- Key facts -->
+    <section class="card">
+      <div class="card-head"><h2>핵심 수치</h2></div>
+      <dl class="kv" id="factsBody"></dl>
+    </section>
+
+    <!-- Evidence & sources -->
+    <section class="card">
+      <div class="card-head"><h2>근거 &amp; 출처</h2></div>
+      <ul class="sources" id="evidenceBody"></ul>
+      <p class="note">규제 기관 라벨·동료심사 문헌 기반의 교육용 추정입니다. 링크는 원문(주로 영문)으로 연결됩니다.</p>
+    </section>
+
     <!-- Locked advanced feature -->
     <section class="card locked">
       <div class="locked-body">
@@ -118,15 +137,6 @@
       본 화면은 진단·처방·복용 지시가 아닙니다.
     </section>
   </main>
-
-  <!-- Info bottom sheet -->
-  <div class="sheet-backdrop" id="backdrop"></div>
-  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-    <div class="grabber"></div>
-    <h3 id="sheetTitle">이 그래프는 무엇인가요?</h3>
-    <div id="sheetBody"></div>
-    <button class="close" id="sheetClose">닫기</button>
-  </div>
 
   <script type="module">
     import { profiles } from "./pk-profiles.js";
@@ -272,9 +282,18 @@
         svg.push(`<text x="${xOf(h).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${h}</text>`);
       }
 
-      const ex0 = xOf(profile.effectStartHours).toFixed(1);
-      const ex1 = xOf(Math.min(profile.effectEndHours, grid.endHour)).toFixed(1);
-      svg.push(`<rect x="${ex0}" y="${padT}" width="${(ex1 - ex0).toFixed(1)}" height="${plotH}" fill="var(--accent-soft)"/>`);
+      // Effect window (작용 구간): a distinct amber band with dashed edges, drawn
+      // only when the profile defines one (accumulation meds have none).
+      const hasWindow = Number.isFinite(profile.effectStartHours) && Number.isFinite(profile.effectEndHours);
+      if (hasWindow) {
+        const ex0 = xOf(profile.effectStartHours);
+        const ex1 = xOf(Math.min(profile.effectEndHours, grid.endHour));
+        svg.push(`<rect x="${ex0.toFixed(1)}" y="${padT}" width="${(ex1 - ex0).toFixed(1)}" height="${plotH}" fill="var(--effect-band)"/>`);
+        for (const ex of [ex0, ex1]) {
+          svg.push(`<line x1="${ex.toFixed(1)}" y1="${padT}" x2="${ex.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="var(--effect-edge)" stroke-dasharray="3 3" stroke-width="1"/>`);
+        }
+      }
+      document.querySelectorAll(".effect-only").forEach((el) => { el.style.display = hasWindow ? "" : "none"; });
 
       svg.push(`<path d="${areaFrom(series)}" fill="var(--accent-soft)"/>`);
       svg.push(`<path d="${pathFrom(series)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`);
@@ -348,6 +367,71 @@
       document.getElementById("chipNow").innerHTML = `${nowPct.toFixed(0)}<span class="unit"> %</span>`;
     }
 
+    // ----- explanation, key facts, evidence (data-driven from the profile) -----
+    const TYPE_LABEL = {
+      "regulatory-label": "규제 라벨",
+      "peer-reviewed": "동료심사",
+      "model-form-reference": "모델 방법론",
+      "clinical-guidance": "임상 가이드",
+      "derived-estimate": "파생 추정",
+    };
+    const CONF_LABEL = { high: "높음", medium: "중간", low: "낮음" };
+    const RELEASE_LABEL = {
+      "oros-dual": "OROS 서방정 (IR+ER)",
+      immediate: "속방정",
+      "er-capsule": "서방캡슐 (IR+ER)",
+    };
+
+    function renderExplanation() {
+      document.getElementById("explainBody").innerHTML =
+        medConfig.sheet.map((p) => `<p>${p}</p>`).join("");
+    }
+
+    function renderFacts() {
+      const r = profile.reference;
+      const norm = isAccum();
+      const rows = [
+        ["제형", RELEASE_LABEL[profile.releaseProfile] ?? profile.releaseProfile],
+        ["모델 종류", norm ? "누적형 (수주~수개월)" : "당일 곡선"],
+        ["Tmax (최고 시간)", `${r.tmaxHours} 시간`],
+        ["반감기", `${profile.halfLifeHours} 시간`],
+      ];
+      if (norm) {
+        rows.push(["Cmax / AUC", "정규화 표시 (라벨에 절대값 없음)"]);
+        rows.push(["효과 발현 / 안정화", `${profile.effectAccrual.onsetWeeks}주 / ${profile.effectAccrual.stabilizeWeeks}주`]);
+      } else {
+        rows.push([`Cmax (${r.calibrationDoseMg}mg)`, r.cmaxNgPerMl != null ? `${r.cmaxNgPerMl} ng/mL` : "—"]);
+        rows.push([`AUC (${r.calibrationDoseMg}mg)`, `${r.aucNgHPerMl} ng·h/mL`]);
+      }
+      if (Number.isFinite(profile.effectStartHours) && Number.isFinite(profile.effectEndHours)) {
+        rows.push(["작용 구간 (임상 추정)", `${profile.effectStartHours}~${profile.effectEndHours} 시간`]);
+      }
+      document.getElementById("factsBody").innerHTML = rows
+        .map(([k, v]) => `<div class="kv-row"><dt>${k}</dt><dd>${v}</dd></div>`)
+        .join("");
+    }
+
+    function renderEvidence() {
+      document.getElementById("evidenceBody").innerHTML = (profile.evidence ?? [])
+        .map((e) => {
+          const type = TYPE_LABEL[e.type] ?? e.type;
+          const conf = CONF_LABEL[e.confidence] ?? e.confidence;
+          const link = e.url
+            ? `<a class="source-link" href="${e.url}" target="_blank" rel="noopener">원문 보기 ↗</a>`
+            : "";
+          return `<li class="source-item">
+            <div class="source-head">
+              <span class="badge badge-type">${type}</span>
+              <span class="badge badge-${e.confidence}">신뢰도 ${conf}</span>
+            </div>
+            <div class="source-name">${e.source}</div>
+            ${e.note ? `<div class="source-note">${e.note}</div>` : ""}
+            ${link}
+          </li>`;
+        })
+        .join("");
+    }
+
     function render() {
       const accum = isAccum();
       document.getElementById("effectCard").hidden = !accum;
@@ -366,7 +450,9 @@
       document.getElementById("medName").textContent = `${profile.brandName} 농도`;
       document.getElementById("medGeneric").textContent =
         `${profile.displayName} · ${profile.genericName} · 교육용 추정 · 의료 조언 아님`;
-      document.getElementById("sheetBody").innerHTML = medConfig.sheet.map((p) => `<p>${p}</p>`).join("");
+      renderExplanation();
+      renderFacts();
+      renderEvidence();
     }
 
     function selectMed(id) {
@@ -402,15 +488,6 @@
       showComponents = e.target.checked;
       render();
     });
-
-    // Info bottom sheet
-    const backdrop = document.getElementById("backdrop");
-    const sheet = document.getElementById("sheet");
-    const open = () => { backdrop.dataset.open = "true"; sheet.dataset.open = "true"; };
-    const close = () => { backdrop.dataset.open = "false"; sheet.dataset.open = "false"; };
-    document.getElementById("infoBtn").addEventListener("click", open);
-    document.getElementById("sheetClose").addEventListener("click", close);
-    backdrop.addEventListener("click", close);
 
     // Init (optional ?med=<id> deep link for previews)
     const requested = new URLSearchParams(location.search).get("med");
