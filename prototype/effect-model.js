@@ -1,7 +1,14 @@
 // Pure clinical-effect-accrual model for accumulation-type medications
 // (e.g., atomoxetine). This is NOT pharmacokinetics — it describes how the
 // therapeutic effect builds over WEEKS, separate from the daily blood curve.
-// Educational illustration only; not a clinical measurement.
+//
+// Why a sigmoid (Weibull CDF) and not a line or log curve: non-stimulant ADHD
+// drugs act via gradual receptor/neural adaptation, so the response builds
+// slowly at first, rises through the early weeks, then plateaus — the standard
+// receptor-adaptation PD shape. This matches reported atomoxetine trajectories
+// (gradual, progressive; median improvement ~3.7 weeks; continued gains to
+// ~5 months). The endpoints are evidence-anchored; the exact point-by-point
+// trajectory is an educational approximation. See pk-profiles.js evidence.
 //
 // No DOM, drawing-surface, browser-storage, network, or framework imports here.
 

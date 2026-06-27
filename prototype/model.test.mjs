@@ -110,11 +110,12 @@ test("effectAccrualFraction is monotonic, 0 at week 0, ~25%/90% at onset/stabili
 });
 
 test("buildEffectAccrualSeries spans 0..endWeeks rising to near full effect", () => {
-  const series = buildEffectAccrualSeries({ effectAccrual: atomoxetine.effectAccrual, endWeeks: 10 });
+  const endWeeks = atomoxetine.effectAccrual.stabilizeWeeks + 4;
+  const series = buildEffectAccrualSeries({ effectAccrual: atomoxetine.effectAccrual, endWeeks });
   assert.equal(series[0].week, 0);
   assert.equal(series[0].percent, 0);
-  assert.equal(series[series.length - 1].week, 10);
-  assert.ok(series[series.length - 1].percent > 90, "near full effect by 10 weeks");
+  assert.equal(series[series.length - 1].week, endWeeks);
+  assert.ok(series[series.length - 1].percent > 90, "near full effect past stabilize");
   // stabilizeWeeks anchor (~90%)
   const atStabilize = series.find((s) => Math.abs(s.week - atomoxetine.effectAccrual.stabilizeWeeks) < 1e-9);
   assert.ok(Math.abs(atStabilize.percent - 90) < 2, `~90% at stabilize, got ${atStabilize.percent}`);

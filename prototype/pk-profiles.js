@@ -168,11 +168,18 @@ export const atomoxetine = {
   halfLifeHours: 5.2, // EM mean; PM ~21.6 h (see metabolismNote)
 
   peakTimeHours: 1.5,
-  // Clinical effect time-course. The FDA label's Clinical Studies section grounds
-  // the timescale: ADHD efficacy trials ran 6–10 weeks and significant separation
-  // from placebo was shown by ~8 weeks. The exact accrual SHAPE is illustrative
-  // (the label gives no week-by-week effect curve); onsetWeeks is an estimate.
-  effectAccrual: { onsetWeeks: 2, stabilizeWeeks: 8 },
+  // Clinical effect time-course, evidence-based:
+  //  - Endpoints/anchors: peer-reviewed time-course study (Newcorn/Canadian
+  //    open-label, PMC3120776) — median time to improvement 3.7 weeks; response
+  //    rises GRADUALLY and continues up to ~5 months (~20 weeks) before plateau.
+  //    onsetWeeks 4 (≈ median improvement, ~25% anchor), stabilizeWeeks 20
+  //    (~5-month plateau, ~90% anchor).
+  //  - Shape: sigmoid (Weibull CDF) reflects the receptor-adaptation PD model
+  //    standard for non-stimulant/neuropsychiatric drugs — slow build, mid rise,
+  //    plateau. Not a linear or stimulant-like log rise. See evidence below.
+  // FDA trials (6–10 weeks, significant by ~8 weeks) only captured the early
+  // rising part; they do NOT mean the effect peaks at 8 weeks.
+  effectAccrual: { onsetWeeks: 4, stabilizeWeeks: 20 },
 
   release: {
     irFraction: 1.0,
@@ -205,7 +212,21 @@ export const atomoxetine = {
       url: "https://dailymed.nlm.nih.gov/dailymed/fda/fdaDrugXsl.cfm?setid=309de576-c318-404a-bc15-660c2b1876fb",
       type: "regulatory-label",
       confidence: "medium",
-      note: "효능 시험 6~10주; 위약 대비 유의한 개선이 ~8주까지 확인. 누적 곡선의 정확한 모양은 교육용 예시(라벨이 주별 효과 곡선을 주지 않음).",
+      note: "효능 시험 6~10주; 위약 대비 유의한 개선이 ~8주까지 확인(짧은 시험이라 초기 상승 구간만 관찰).",
+    },
+    {
+      source: "Time course of improvement on atomoxetine (Canadian open-label), PMC3120776",
+      url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3120776/",
+      type: "peer-reviewed",
+      confidence: "medium",
+      note: "개선 중앙값 3.7주; 강한 개선 확률 4주 47% → 12주 76% → 26주 85% → 52주 96%; 점진적 상승 후 ~5개월 평탄화. → onset/stabilize 앵커 근거.",
+    },
+    {
+      source: "Clemow & Bushe 2015, atomoxetine onset/trajectory review (J Psychopharmacol)",
+      url: "https://journals.sagepub.com/doi/10.1177/0269881115602489",
+      type: "model-form-reference",
+      confidence: "medium",
+      note: "지연 발현·점진적 궤적(수용체 적응 PD 모델) → S곡선(Weibull/sigmoid) 채택 근거. 직선/로그형이 아닌 이유. 곡선의 정확한 점별 값은 교육용 근사.",
     },
   ],
 };
