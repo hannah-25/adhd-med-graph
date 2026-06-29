@@ -283,6 +283,9 @@ html, body {
 .explain p { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: var(--text-dim); }
 .explain p:last-child { margin-bottom: 0; }
 .explain strong { color: var(--text); }
+.explain ul { margin: 0 0 10px; padding-left: 18px; }
+.explain li { font-size: 13px; line-height: 1.6; color: var(--text-dim); margin-bottom: 4px; }
+.explain li:last-child { margin-bottom: 0; }
 
 /* Key facts (key-value table) */
 .kv { margin: 0; display: flex; flex-direction: column; gap: 8px; }

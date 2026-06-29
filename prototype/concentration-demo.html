@@ -104,6 +104,10 @@
           오후 추가 복용 누적 보기
         </label>
       </div>
+      <div class="control-row" id="secondDoseAmountRow" hidden>
+        <span>추가 복용 용량</span>
+        <div class="seg" id="secondDoseSeg" role="group" aria-label="추가 복용 용량 선택"></div>
+      </div>
       <div class="control-row" id="secondDoseRow" hidden>
         <label for="secondDoseTime">추가 복용 시간</label>
         <input class="time-input" type="time" id="secondDoseTime" value="14:00" />
@@ -133,6 +137,41 @@
       <div class="card-head"><h2>근거 &amp; 출처</h2></div>
       <ul class="sources" id="evidenceBody"></ul>
       <p class="note">규제 기관 라벨·동료심사 문헌 기반의 교육용 추정입니다. 링크는 원문(주로 영문)으로 연결됩니다.</p>
+    </section>
+
+    <!-- Domestic (Korea) usage / combination / reimbursement -->
+    <section class="card">
+      <details class="collapsible">
+        <summary class="card-head"><h2>국내 사용 · 병용 · 급여 (참고)</h2></summary>
+
+        <p class="note" style="margin-top:0">국내 규제·급여·임상 관행에 대한 <strong>교육용 정보</strong>이며 의료 조언이 아닙니다. 급여 기준은 개정으로 바뀌므로 최신 심평원 고시를 확인하세요.</p>
+
+        <div class="explain">
+          <p><strong>국내 허가 성분(3종)</strong> — 메틸페니데이트(콘서타·메디키넷·페니드 등, 향정신성의약품), 아토목세틴, 클로니딘. <strong>미허가:</strong> 구안파신(인튜니브), 암페타민계(애더럴·바이반스).</p>
+
+          <p><strong>실제 쓰이는 병용</strong></p>
+          <ul>
+            <li>장시간 MPH + 속방형 MPH(같은 성분) — 콘서타/메디키넷 오전 + 페니드 오후 보충(엄밀히는 용량·시간 조절). <em>위 ‘오후 추가 복용 누적 보기’로 곡선 확인 가능.</em></li>
+            <li>자극제(MPH) + 아토목세틴 — 단독 부분반응자에 추가(근거 제한적).</li>
+            <li>자극제(MPH) + 클로니딘 — 틱·수면 동반이나 부작용 상쇄 목적. 국내선 구안파신 대신 클로니딘.</li>
+          </ul>
+
+          <p><strong>급여 원칙(심평원)</strong> — 초진은 1종 단독 투여 원칙, 병용은 근거 미비로 사례별 심사. 비자극제끼리(아토목세틴 + 클로니딘) 병용은 급여 불인정.</p>
+
+          <p><strong>성인 적용</strong> — 2016.9부터 18~65세 메틸페니데이트·아토목세틴 급여. 단 ‘12세 이전 발병’ 등 진단기준이 엄격해 비급여 처방 비율이 높음(보도 기준 콘서타 등 약 45%). 65세 초과·암페타민계·구안파신은 제외.</p>
+        </div>
+
+        <p class="note">
+          출처:
+          <a href="http://www.healtho.co.kr/news/view.php?idx=148158" target="_blank" rel="noopener">헬스오(급여 연혁)</a> ·
+          <a href="https://www.kpanews.co.kr/news/articleView.html?idxno=535382" target="_blank" rel="noopener">약사공론(성인 18–65)</a> ·
+          <a href="http://www.bosa.co.kr/news/articleView.html?idxno=2246150" target="_blank" rel="noopener">의학신문(아토목세틴+클로니딘 급여 불인정)</a> ·
+          <a href="http://www.docdocdoc.co.kr/news/articleView.html?idxno=203349" target="_blank" rel="noopener">청년의사(급여기준)</a> ·
+          <a href="http://www.newsmp.com/news/articleView.html?idxno=153490" target="_blank" rel="noopener">메디칼업저버(성인 비급여)</a> ·
+          <a href="https://www.dailymedi.com/news/news_view.php?wr_id=917034" target="_blank" rel="noopener">데일리메디(45% 비급여)</a> ·
+          <a href="https://jkma.org/journal/view.php?viewtype=pubreader&number=3192" target="_blank" rel="noopener">대한의사협회지(성인 ADHD 약물치료)</a>
+        </p>
+      </details>
     </section>
 
     <!-- Locked advanced feature -->
@@ -199,6 +238,7 @@
         sheet: [
           "메디키넷 리타드는 캡슐의 <strong>절반(50%)이 즉시방출(IR)</strong>되어 빠른 초기 상승을 만들고, 나머지 <strong>절반(50%)이 서서히 방출(ER)</strong>되어 3~4시간 플래토를 형성합니다. 아침 식후 복용이 권장됩니다.",
           "전체 최고 농도는 약 2.75시간이며, 이후 반감기 약 3.2시간을 따라 완만히 감소합니다. 단위는 ng/mL입니다.",
+          "작용시간이 약 8시간이라 하루 종일 효과가 필요하면 <strong>오전 + 이른 오후(약 5~6시간 뒤)로 하루 2회</strong> 복용하기도 합니다. 아래 <strong>‘오후 추가 복용 누적 보기’</strong>를 켜면 2회 복용이 누적된 곡선을 볼 수 있습니다(추가 복용 시간 조절 가능).",
           "표시 값은 성인 평균 기반 추정이며 개인차가 있습니다.",
         ],
       },
@@ -256,10 +296,13 @@
     const secondDoseToggle = document.getElementById("secondDoseToggle");
     const secondDoseRow = document.getElementById("secondDoseRow");
     const secondDoseTimeInput = document.getElementById("secondDoseTime");
+    const secondDoseSeg = document.getElementById("secondDoseSeg");
+    const secondDoseAmountRow = document.getElementById("secondDoseAmountRow");
 
     let medConfig = DEMO_MEDS[0];
     let profile = profiles[medConfig.id];
     let dose = medConfig.defaultDose;
+    let secondDose = medConfig.defaultDose;
     let week = medConfig.defaultWeek ?? 0;
     let yMax = 1;
     let showComponents = false;
@@ -319,11 +362,11 @@
       return ((second - first + 1440) % 1440) / 60;
     }
 
-    function doseEventsFor(amountMg, includeSecondDose = secondDoseEnabled) {
+    function doseEventsFor(amountMg, includeSecondDose = secondDoseEnabled, secondAmountMg = secondDose) {
       const events = [createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: 0 })];
       const secondHour = secondDoseOffsetHour();
       if (!isAccum() && includeSecondDose && secondHour > 0 && secondHour <= grid.endHour) {
-        events.push(createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: secondHour }));
+        events.push(createDoseEvent({ medicationId: profile.id, amountMg: secondAmountMg, takenAtHour: secondHour }));
       }
       return events;
     }
@@ -353,6 +396,9 @@
       doseSeg.innerHTML = medConfig.doses
         .map((d) => `<button data-dose="${d}" aria-pressed="${d === dose}">${d}mg</button>`)
         .join("");
+      secondDoseSeg.innerHTML = medConfig.doses
+        .map((d) => `<button data-second-dose="${d}" aria-pressed="${d === secondDose}">${d}mg</button>`)
+        .join("");
       weekSeg.innerHTML = (medConfig.weeks ?? [])
         .map((w) => `<button data-week="${w}" aria-pressed="${w === week}">${w}주</button>`)
         .join("");
@@ -364,7 +410,8 @@
       const normalized = isAccum();
       const primary = seriesFor(profile, dose, doseEventsFor(dose, false));
       const { series, components, stats } = seriesFor(profile, dose, doseEventsFor(dose));
-      const maxDose = seriesFor(profile, Math.max(...medConfig.doses), doseEventsFor(Math.max(...medConfig.doses)));
+      const maxAmt = Math.max(...medConfig.doses);
+      const maxDose = seriesFor(profile, maxAmt, doseEventsFor(maxAmt, secondDoseEnabled, maxAmt));
       yMax = normalized ? 108 : Math.max(stats.cmaxRaw, maxDose.stats.cmaxRaw) * 1.1;
       currentSeries = series;
       currentNormalized = normalized;
@@ -563,6 +610,7 @@
       document.getElementById("weeksCard").hidden = !accum;
       document.getElementById("doseCard").hidden = accum;
       secondDoseRow.hidden = accum || !secondDoseEnabled;
+      secondDoseAmountRow.hidden = accum || !secondDoseEnabled;
       document.getElementById("chartChips").style.display = accum ? "none" : "";
       document.getElementById("chartTitle").textContent = accum ? "정상상태 일일 농도 (정규화)" : "혈중 농도 추정";
 
@@ -585,6 +633,7 @@
       medConfig = DEMO_MEDS.find((m) => m.id === id);
       profile = profiles[medConfig.id];
       dose = medConfig.defaultDose;
+      secondDose = medConfig.defaultDose;
       week = medConfig.defaultWeek ?? 0;
       showComponents = false;
       document.getElementById("compToggle").checked = false;
@@ -601,6 +650,13 @@
       if (!btn) return;
       dose = Number(btn.dataset.dose);
       doseSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    secondDoseSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-second-dose]");
+      if (!btn) return;
+      secondDose = Number(btn.dataset.secondDose);
+      secondDoseSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
       render();
     });
     weekSeg.addEventListener("click", (e) => {
