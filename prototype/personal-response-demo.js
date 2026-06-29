@@ -1,4 +1,4 @@
-import { concertaOros } from "./pk-profiles.js";
+import { profiles } from "./pk-profiles.js";
 import { createDoseEvent } from "./dose-events.js";
 import { buildConcentrationSeries } from "./concentration-series.js";
 import { attuneJournalTags, attunePdCalibrationFixtures } from "./attune-journal-fixtures.js";
@@ -9,6 +9,8 @@ const personaSeg = document.getElementById("personaSeg");
 const summaryBody = document.getElementById("summaryBody");
 const observationBody = document.getElementById("observationBody");
 const personaDescription = document.getElementById("personaDescription");
+const medSeg = document.getElementById("medSeg");
+const medNoteEl = document.getElementById("medNote");
 
 const W = 720;
 const H = 280;
@@ -27,9 +29,25 @@ let selectedPersonaId = attunePdCalibrationFixtures[0].personaId;
 let absorptionScale = 1;
 let currentModel = null;
 
-const TMAX_MIN = 2.5;
-const TMAX_MAX = 10;
-const doseEvents = [createDoseEvent({ medicationId: concertaOros.id, amountMg: 18, takenAtHour: 0 })];
+const TMAX_MIN = 0.5;
+const TMAX_MAX = 11;
+
+const MEDS = [
+  { id: "concerta-oros", label: "콘서타", dose: 18 },
+  { id: "methylphenidate-medikinet", label: "메디키넷", dose: 20 },
+  { id: "methylphenidate-ir", label: "페니드", dose: 10 },
+  { id: "atomoxetine", label: "아토목세틴", dose: 40 },
+];
+let selectedMedId = MEDS[0].id;
+const currentProfile = () => profiles[selectedMedId];
+const currentDoseEvents = () => {
+  const med = MEDS.find((m) => m.id === selectedMedId);
+  return [createDoseEvent({ medicationId: med.id, amountMg: med.dose, takenAtHour: 0 })];
+};
+// Per-medication caveat shown above the chart (e.g., non-stimulant accumulation).
+const medNote = {
+  atomoxetine: "아토목세틴은 비자극제로 임상 효과가 수주~수개월에 걸쳐 누적됩니다. 아래 곡선은 정상상태 하루 농도(정규화)이며 효과 세기가 아닙니다.",
+};
 
 const xOf = (hour) => padL + (hour / grid.endHour) * plotW;
 const yOf = (percent) => padT + plotH - (percent / 100) * plotH;
@@ -101,6 +119,12 @@ const signalLaneY = {
   [PD_SIGNAL.CONTEXT]: 50,
 };
 
+function renderMedSegments() {
+  medSeg.innerHTML = MEDS
+    .map((m) => `<button data-med="${m.id}" aria-pressed="${m.id === selectedMedId}">${m.label}</button>`)
+    .join("");
+}
+
 function renderPersonaSegments() {
   personaSeg.innerHTML = attunePdCalibrationFixtures
     .map((fixture) => `
@@ -116,9 +140,10 @@ function renderPersonaSegments() {
 // shifting Tmax earlier — the PK signature of a faster-absorbing individual.
 // Elimination half-life is left unchanged (a separate physiological parameter).
 function profileForScale(scale) {
-  const r = concertaOros.release;
+  const p = currentProfile();
+  const r = p.release;
   return {
-    ...concertaOros,
+    ...p,
     release: {
       irFraction: r.irFraction,
       ir: { ...r.ir, rate: r.ir.rate * scale },
@@ -128,14 +153,15 @@ function profileForScale(scale) {
 }
 
 function seriesForScale(scale) {
-  return buildConcentrationSeries({ profile: profileForScale(scale), doseEvents, grid });
+  return buildConcentrationSeries({ profile: profileForScale(scale), doseEvents: currentDoseEvents(), grid });
 }
 
 // Tmax decreases monotonically as scale increases, so binary-search the scale
-// that puts the peak at the dragged target hour.
+// that puts the peak at the dragged target hour. Wide range covers fast IR
+// (early Tmax) through slow ER profiles.
 function solveScaleForTmax(targetTmax) {
-  let lo = 0.4;
-  let hi = 3.0;
+  let lo = 0.3;
+  let hi = 5.0;
   for (let i = 0; i < 26; i += 1) {
     const mid = (lo + hi) / 2;
     if (seriesForScale(mid).stats.tmaxHour > targetTmax) lo = mid;
@@ -240,11 +266,24 @@ function render() {
   });
 
   currentModel = model;
+  renderMedSegments();
   renderPersonaSegments();
   renderChart(model);
   renderSummary(model, fixture);
   renderObservations(model);
+
+  const note = medNote[selectedMedId];
+  medNoteEl.textContent = note ?? "";
+  medNoteEl.hidden = !note;
 }
+
+medSeg.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-med]");
+  if (!button) return;
+  selectedMedId = button.dataset.med;
+  absorptionScale = 1; // reset the Tmax adjustment when the medication changes
+  render();
+});
 
 personaSeg.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-persona]");
