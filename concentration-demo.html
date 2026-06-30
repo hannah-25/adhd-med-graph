@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ADHD 약물 농도 그래프 (프로토타입)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="app-header">
+      <h1 id="medName">약물 농도</h1>
+      <p id="medGeneric">교육용 추정 그래프 · 의료 조언 아님</p>
+    </header>
+
+    <!-- Medication selector -->
+    <section class="card controls">
+      <div class="control-row">
+        <span>약물</span>
+        <div class="seg" id="medSeg" role="group" aria-label="약물 선택"></div>
+      </div>
+    </section>
+
+    <!-- Effect accrual (accumulation meds only, e.g. atomoxetine) -->
+    <section class="card" id="effectCard" hidden>
+      <div class="card-head"><h2>효과 누적 진행</h2></div>
+      <div class="chart-wrap">
+        <svg class="chart" id="effectChart" viewBox="0 0 360 130" role="img"
+             aria-label="주 단위 임상 효과 누적 경과"></svg>
+      </div>
+      <div class="chips">
+        <div class="chip"><span class="label">효과 발현</span><span class="value" id="chipOnset">–<span class="unit"> 주</span></span></div>
+        <div class="chip"><span class="label">안정화</span><span class="value" id="chipStabilize">–<span class="unit"> 주</span></span></div>
+        <div class="chip"><span class="label">현재 효과</span><span class="value" id="chipNow">–<span class="unit"> %</span></span></div>
+      </div>
+      <p class="note">혈중 농도가 아니라 <strong>임상 효과의 누적 경과</strong>입니다. 효과는 수주에 걸쳐 나타납니다.</p>
+    </section>
+
+    <!-- Weeks control (accumulation meds only) -->
+    <section class="card controls" id="weeksCard" hidden>
+      <div class="control-row">
+        <span>복용 주차</span>
+        <div class="seg" id="weekSeg" role="group" aria-label="복용 주차 선택"></div>
+      </div>
+    </section>
+
+    <!-- Concentration chart card -->
+    <section class="card">
+      <div class="card-head">
+        <h2 id="chartTitle">혈중 농도 추정</h2>
+      </div>
+
+      <div class="chart-wrap">
+        <svg class="chart" id="chart" viewBox="0 0 360 200" role="img"
+             aria-label="시간에 따른 혈중 농도 추정 곡선" tabindex="0"></svg>
+        <div class="chart-hover" id="chartHover" aria-hidden="true">
+          <span class="chart-hover-label">경과 시간</span>
+          <span class="chart-hover-time" id="chartHoverTime"></span>
+          <span class="chart-hover-clock" id="chartHoverClock"></span>
+          <span class="chart-hover-value" id="chartHoverValue"></span>
+          <span class="chart-hover-effect" id="chartHoverEffect"></span>
+        </div>
+      </div>
+
+      <div class="chart-legend" id="legend">
+        <span><span class="swatch" style="background:var(--accent)"></span>전체</span>
+        <span class="now-only"><span class="swatch swatch-line" style="background:var(--now)"></span>복용 후 지금</span>
+        <span class="multi-dose-only"><span class="swatch swatch-line" style="background:var(--text-dim)"></span>단일 복용 비교</span>
+        <span class="effect-only"><span class="swatch" style="background:var(--effect-band);border:1px dashed var(--effect-edge)"></span>작용 구간(임상 작용시간)</span>
+        <span class="comp-only"><span class="swatch" style="background:var(--ir)"></span>즉시방출(IR)</span>
+        <span class="comp-only"><span class="swatch" style="background:var(--er)"></span>서방형(ER)</span>
+      </div>
+
+      <div class="chips" id="chartChips">
+        <div class="chip">
+          <span class="label">1차 피크</span>
+          <span class="value" id="chipFirst">–<span class="unit"> h</span></span>
+        </div>
+        <div class="chip">
+          <span class="label">최대 농도</span>
+          <span class="value" id="chipMax">–<span class="unit"> h</span></span>
+        </div>
+        <div class="chip">
+          <span class="label">작용 종료</span>
+          <span class="value" id="chipEnd">–<span class="unit"> h</span></span>
+        </div>
+      </div>
+      <p class="note" id="chartNote" hidden></p>
+    </section>
+
+    <!-- Dose controls -->
+    <section class="card controls" id="doseCard">
+      <div class="control-row">
+        <span>용량</span>
+        <div class="seg" id="doseSeg" role="group" aria-label="용량 선택"></div>
+      </div>
+      <div class="control-row">
+        <label for="doseTime">복용 시간</label>
+        <input class="time-input" type="time" id="doseTime" value="08:00" />
+      </div>
+      <div class="control-row">
+        <label class="toggle">
+          <input type="checkbox" id="secondDoseToggle" />
+          오후 추가 복용 누적 보기
+        </label>
+      </div>
+      <div class="control-row" id="secondDoseAmountRow" hidden>
+        <span>추가 복용 용량</span>
+        <div class="seg" id="secondDoseSeg" role="group" aria-label="추가 복용 용량 선택"></div>
+      </div>
+      <div class="control-row" id="secondDoseRow" hidden>
+        <label for="secondDoseTime">추가 복용 시간</label>
+        <input class="time-input" type="time" id="secondDoseTime" value="14:00" />
+      </div>
+      <div class="control-row" id="compRow">
+        <label class="toggle">
+          <input type="checkbox" id="compToggle" />
+          IR / ER 구성 곡선 보기
+        </label>
+      </div>
+    </section>
+
+    <!-- Explanation -->
+    <section class="card">
+      <div class="card-head"><h2>이 약은?</h2></div>
+      <div id="explainBody" class="explain"></div>
+    </section>
+
+    <!-- Key facts -->
+    <section class="card">
+      <div class="card-head"><h2>핵심 수치</h2></div>
+      <dl class="kv" id="factsBody"></dl>
+    </section>
+
+    <!-- Evidence & sources -->
+    <section class="card">
+      <div class="card-head"><h2>근거 &amp; 출처</h2></div>
+      <ul class="sources" id="evidenceBody"></ul>
+      <p class="note">규제 기관 라벨·동료심사 문헌 기반의 교육용 추정입니다. 링크는 원문(주로 영문)으로 연결됩니다.</p>
+    </section>
+
+    <!-- Domestic (Korea) usage / combination / reimbursement -->
+    <section class="card">
+      <details class="collapsible">
+        <summary class="card-head"><h2>국내 사용 · 병용 · 급여 (참고)</h2></summary>
+
+        <p class="note" style="margin-top:0">국내 규제·급여·임상 관행에 대한 <strong>교육용 정보</strong>이며 의료 조언이 아닙니다. 급여 기준은 개정으로 바뀌므로 최신 심평원 고시를 확인하세요.</p>
+
+        <div class="explain">
+          <p><strong>국내 허가 성분(3종)</strong> — 메틸페니데이트(콘서타·메디키넷·페니드 등, 향정신성의약품), 아토목세틴, 클로니딘. <strong>미허가:</strong> 구안파신(인튜니브), 암페타민계(애더럴·바이반스).</p>
+
+          <p><strong>실제 쓰이는 병용</strong></p>
+          <ul>
+            <li>장시간 MPH + 속방형 MPH(같은 성분) — 콘서타/메디키넷 오전 + 페니드 오후 보충(엄밀히는 용량·시간 조절). <em>위 ‘오후 추가 복용 누적 보기’로 곡선 확인 가능.</em></li>
+            <li>자극제(MPH) + 아토목세틴 — 단독 부분반응자에 추가(근거 제한적).</li>
+            <li>자극제(MPH) + 클로니딘 — 틱·수면 동반이나 부작용 상쇄 목적. 국내선 구안파신 대신 클로니딘.</li>
+          </ul>
+
+          <p><strong>급여 원칙(심평원)</strong> — 초진은 1종 단독 투여 원칙, 병용은 근거 미비로 사례별 심사. 비자극제끼리(아토목세틴 + 클로니딘) 병용은 급여 불인정.</p>
+
+          <p><strong>성인 적용</strong> — 2016.9부터 18~65세 메틸페니데이트·아토목세틴 급여. 단 ‘12세 이전 발병’ 등 진단기준이 엄격해 비급여 처방 비율이 높음(보도 기준 콘서타 등 약 45%). 65세 초과·암페타민계·구안파신은 제외.</p>
+        </div>
+
+        <p class="note">
+          출처:
+          <a href="http://www.healtho.co.kr/news/view.php?idx=148158" target="_blank" rel="noopener">헬스오(급여 연혁)</a> ·
+          <a href="https://www.kpanews.co.kr/news/articleView.html?idxno=535382" target="_blank" rel="noopener">약사공론(성인 18–65)</a> ·
+          <a href="http://www.bosa.co.kr/news/articleView.html?idxno=2246150" target="_blank" rel="noopener">의학신문(아토목세틴+클로니딘 급여 불인정)</a> ·
+          <a href="http://www.docdocdoc.co.kr/news/articleView.html?idxno=203349" target="_blank" rel="noopener">청년의사(급여기준)</a> ·
+          <a href="http://www.newsmp.com/news/articleView.html?idxno=153490" target="_blank" rel="noopener">메디칼업저버(성인 비급여)</a> ·
+          <a href="https://www.dailymedi.com/news/news_view.php?wr_id=917034" target="_blank" rel="noopener">데일리메디(45% 비급여)</a> ·
+          <a href="https://jkma.org/journal/view.php?viewtype=pubreader&number=3192" target="_blank" rel="noopener">대한의사협회지(성인 ADHD 약물치료)</a>
+        </p>
+      </details>
+    </section>
+
+    <!-- Locked advanced feature -->
+    <section class="card locked">
+      <div class="locked-body">
+        <div class="card-head"><h2>개인 반응 보정</h2></div>
+        <p style="color:var(--text-dim);font-size:13px;margin:0">
+          체중·대사·복용 기록을 반영해 곡선을 개인화합니다.
+        </p>
+      </div>
+      <div class="locked-overlay">
+        <div class="lock">🔒</div>
+        <div class="title">개인 반응 보정</div>
+        <div class="sub">개인화된 곡선 보정은 추후 제공됩니다.</div>
+        <span class="pill">PRO</span>
+      </div>
+    </section>
+
+    <!-- Medical safety copy -->
+    <section class="safety">
+      <strong>의료 안전 안내.</strong>
+      이 그래프는 평균 데이터 기반의 <strong>교육용 추정치</strong>입니다.
+      실제 혈중 농도·효과·부작용·개인 반응은 크게 다를 수 있습니다.
+      복용량이나 복용 시간 변경은 반드시 처방 의료진과 상의하세요.
+      본 화면은 진단·처방·복용 지시가 아닙니다.
+    </section>
+  </main>
+
+  <script type="module">
+    import { profiles } from "./pk-profiles.js";
+    import { createDoseEvent } from "./dose-events.js";
+    import { buildConcentrationSeries } from "./concentration-series.js";
+    import { buildEffectAccrualSeries, effectAccrualFraction } from "./effect-model.js";
+
+    // UI-only configuration per medication (dose options + info copy).
+    const DEMO_MEDS = [
+      {
+        id: "concerta-oros",
+        label: "콘서타",
+        doses: [18, 27, 36, 54],
+        defaultDose: 18,
+        sheet: [
+          "콘서타는 알약 겉면의 <strong>즉시방출(IR, 22%)</strong>이 1시간 안에 첫 봉우리를 만들고, 내부 삼투압(OROS) 시스템의 <strong>서방형(ER, 78%)</strong>이 약을 서서히 밀어내며 약 6.8시간에 최고 농도에 도달합니다.",
+          "이후 농도는 반감기 약 3.5시간을 따라 점차 감소합니다. 곡선은 성인 평균 데이터에 맞춰 보정한 추정값이며 단위는 ng/mL입니다.",
+          "개인의 체중·대사·다른 약물·식사에 따라 실제 곡선은 달라질 수 있습니다.",
+        ],
+      },
+      {
+        id: "methylphenidate-ir",
+        label: "페니드",
+        doses: [5, 10, 20],
+        defaultDose: 10,
+        sheet: [
+          "속방형 메틸페니데이트는 먹은 뒤 빠르게 흡수되어 약 <strong>1.5시간에 단일 최고 농도</strong>에 도달합니다. 콘서타 같은 서방 단계가 없어 봉우리가 하나입니다.",
+          "이후 반감기 약 3시간을 따라 감소합니다. 작용 시간이 짧아 보통 하루 2~3회 나눠 복용합니다.",
+          "표시 값은 성인 평균 기반 추정이며 개인차가 있습니다. 단위는 ng/mL입니다.",
+        ],
+      },
+      {
+        id: "methylphenidate-medikinet",
+        label: "메디키넷",
+        doses: [10, 20, 30, 40],
+        defaultDose: 20,
+        sheet: [
+          "메디키넷 리타드는 캡슐의 <strong>절반(50%)이 즉시방출(IR)</strong>되어 빠른 초기 상승을 만들고, 나머지 <strong>절반(50%)이 서서히 방출(ER)</strong>되어 3~4시간 플래토를 형성합니다. 아침 식후 복용이 권장됩니다.",
+          "전체 최고 농도는 약 2.75시간이며, 이후 반감기 약 3.2시간을 따라 완만히 감소합니다. 단위는 ng/mL입니다.",
+          "작용시간이 약 8시간이라 하루 종일 효과가 필요하면 <strong>오전 + 이른 오후(약 5~6시간 뒤)로 하루 2회</strong> 복용하기도 합니다. 아래 <strong>‘오후 추가 복용 누적 보기’</strong>를 켜면 2회 복용이 누적된 곡선을 볼 수 있습니다(추가 복용 시간 조절 가능).",
+          "표시 값은 성인 평균 기반 추정이며 개인차가 있습니다.",
+        ],
+      },
+      {
+        id: "atomoxetine",
+        label: "스트라테라",
+        accumulation: true,
+        weeks: [0, 4, 8, 12, 16, 24],
+        defaultWeek: 12,
+        doses: [40], // normalized daily curve — dose does not change the % shape
+        defaultDose: 40,
+        sheet: [
+          "아토목세틴은 <strong>비자극제</strong>입니다. 자극제와 달리 먹는 즉시 효과를 느끼는 약이 아니라, <strong>효과가 수주~수개월에 걸쳐 점진적으로 누적</strong>됩니다. 개선까지 중앙값 약 3.7주이며, 효과는 약 5개월(~20주)까지 계속 상승하다 평탄해집니다(위 효과 누적 진행).",
+          "혈중 농도 자체는 며칠 안에 안정됩니다. 아래 일일 곡선은 매일 같은 시간 복용해 농도가 안정된 뒤의 하루 패턴(정규화)이며, <strong>효과의 세기를 나타내지 않습니다</strong>.",
+          "CYP2D6 저대사자는 농도가 크게 높아질 수 있습니다. 효과가 느려도 임의로 끊지 말고 의료진과 상의하세요.",
+        ],
+      },
+    ];
+
+    // Geometry
+    const W = 360, H = 200, padL = 30, padR = 12, padT = 12, padB = 24;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+    const grid = { startHour: 0, endHour: 24, stepMinutes: 10 };
+
+    const xOf = (h) => padL + (h / grid.endHour) * plotW;
+
+    function seriesFor(profile, amountMg, doseEvents = null) {
+      return buildConcentrationSeries({
+        profile,
+        doseEvents: doseEvents ?? [createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: 0 })],
+        grid,
+      });
+    }
+
+    function findFirstPeak(series) {
+      for (let i = 1; i < series.length - 1; i += 1) {
+        if (series[i].hour > 3.5) break;
+        if (series[i].raw >= series[i - 1].raw && series[i].raw > series[i + 1].raw) return series[i];
+      }
+      return series[0];
+    }
+
+    const chart = document.getElementById("chart");
+    const chartHover = document.getElementById("chartHover");
+    const chartHoverTime = document.getElementById("chartHoverTime");
+    const chartHoverClock = document.getElementById("chartHoverClock");
+    const chartHoverValue = document.getElementById("chartHoverValue");
+    const chartHoverEffect = document.getElementById("chartHoverEffect");
+    const effectChart = document.getElementById("effectChart");
+    const medSeg = document.getElementById("medSeg");
+    const doseSeg = document.getElementById("doseSeg");
+    const weekSeg = document.getElementById("weekSeg");
+    const doseTimeInput = document.getElementById("doseTime");
+    const secondDoseToggle = document.getElementById("secondDoseToggle");
+    const secondDoseRow = document.getElementById("secondDoseRow");
+    const secondDoseTimeInput = document.getElementById("secondDoseTime");
+    const secondDoseSeg = document.getElementById("secondDoseSeg");
+    const secondDoseAmountRow = document.getElementById("secondDoseAmountRow");
+
+    let medConfig = DEMO_MEDS[0];
+    let profile = profiles[medConfig.id];
+    let dose = medConfig.defaultDose;
+    let secondDose = medConfig.defaultDose;
+    let week = medConfig.defaultWeek ?? 0;
+    let yMax = 1;
+    let showComponents = false;
+    let currentSeries = [];     // daily-curve series for hover lookup
+    let currentNormalized = false;
+    let selectedHour = null;
+    let secondDoseEnabled = false;
+
+    const isAccum = () => profile.modelKind === "accumulation";
+    const hasErStage = () => profile.release.irFraction < 1;
+
+    const yOf = (v) => padT + plotH - (v / yMax) * plotH;
+    // value accessor: normalized (%) for accumulation meds, else raw ng/mL
+    const dv = (p) => (isAccum() ? p.percent : p.raw);
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+    function pathFrom(points) {
+      return points
+        .map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.hour).toFixed(1)} ${yOf(dv(p)).toFixed(1)}`)
+        .join(" ");
+    }
+    function areaFrom(points) {
+      const x0 = xOf(points[0].hour).toFixed(1);
+      const xN = xOf(points[points.length - 1].hour).toFixed(1);
+      const yBase = yOf(0).toFixed(1);
+      return `${pathFrom(points)} L${xN} ${yBase} L${x0} ${yBase} Z`;
+    }
+
+    function parseClockMinutes(value) {
+      const [h, m] = String(value || "08:00").split(":").map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return 8 * 60;
+      return clamp(h * 60 + m, 0, 1439);
+    }
+
+    function formatClockMinutes(minutes) {
+      const normalized = ((Math.round(minutes) % 1440) + 1440) % 1440;
+      const h = Math.floor(normalized / 60);
+      const m = normalized % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
+    function clockForHour(hour) {
+      return formatClockMinutes(parseClockMinutes(doseTimeInput.value) + hour * 60);
+    }
+
+    function elapsedNowHour() {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const doseMinutes = parseClockMinutes(doseTimeInput.value);
+      const elapsedMinutes = (nowMinutes - doseMinutes + 1440) % 1440;
+      return elapsedMinutes / 60;
+    }
+
+    function secondDoseOffsetHour() {
+      const first = parseClockMinutes(doseTimeInput.value);
+      const second = parseClockMinutes(secondDoseTimeInput.value);
+      return ((second - first + 1440) % 1440) / 60;
+    }
+
+    function doseEventsFor(amountMg, includeSecondDose = secondDoseEnabled, secondAmountMg = secondDose) {
+      const events = [createDoseEvent({ medicationId: profile.id, amountMg, takenAtHour: 0 })];
+      const secondHour = secondDoseOffsetHour();
+      if (!isAccum() && includeSecondDose && secondHour > 0 && secondHour <= grid.endHour) {
+        events.push(createDoseEvent({ medicationId: profile.id, amountMg: secondAmountMg, takenAtHour: secondHour }));
+      }
+      return events;
+    }
+
+    function effectWindows() {
+      if (!Number.isFinite(profile.effectStartHours) || !Number.isFinite(profile.effectEndHours)) return [];
+      return doseEventsFor(dose)
+        .map((event) => ({
+          start: event.takenAtHour + profile.effectStartHours,
+          end: event.takenAtHour + profile.effectEndHours,
+        }))
+        .filter((window) => window.start < grid.endHour && window.end > grid.startHour);
+    }
+
+    function effectStatusForHour(hour) {
+      const windows = effectWindows();
+      if (!windows.length) return "";
+      return windows.some((window) => hour >= window.start && hour <= window.end)
+        ? "예상 작용 구간 안"
+        : "예상 작용 구간 밖";
+    }
+
+    function renderSegments() {
+      medSeg.innerHTML = DEMO_MEDS.map(
+        (m) => `<button data-med="${m.id}" aria-pressed="${m.id === medConfig.id}">${m.label}</button>`,
+      ).join("");
+      doseSeg.innerHTML = medConfig.doses
+        .map((d) => `<button data-dose="${d}" aria-pressed="${d === dose}">${d}mg</button>`)
+        .join("");
+      secondDoseSeg.innerHTML = medConfig.doses
+        .map((d) => `<button data-second-dose="${d}" aria-pressed="${d === secondDose}">${d}mg</button>`)
+        .join("");
+      weekSeg.innerHTML = (medConfig.weeks ?? [])
+        .map((w) => `<button data-week="${w}" aria-pressed="${w === week}">${w}주</button>`)
+        .join("");
+      document.getElementById("compRow").style.display = hasErStage() ? "" : "none";
+    }
+
+    // ----- daily concentration curve (chart card) -----
+    function renderDailyCurve() {
+      const normalized = isAccum();
+      const primary = seriesFor(profile, dose, doseEventsFor(dose, false));
+      const { series, components, stats } = seriesFor(profile, dose, doseEventsFor(dose));
+      const maxAmt = Math.max(...medConfig.doses);
+      const maxDose = seriesFor(profile, maxAmt, doseEventsFor(maxAmt, secondDoseEnabled, maxAmt));
+      yMax = normalized ? 108 : Math.max(stats.cmaxRaw, maxDose.stats.cmaxRaw) * 1.1;
+      currentSeries = series;
+      currentNormalized = normalized;
+      const firstPeak = findFirstPeak(series);
+      const svg = [];
+
+      for (const frac of [0, 0.5, 1]) {
+        const v = yMax * frac;
+        const y = yOf(v).toFixed(1);
+        svg.push(`<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`);
+        svg.push(`<text x="${padL - 5}" y="${(+y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${normalized ? Math.round((v / yMax) * 100) : v.toFixed(1)}</text>`);
+      }
+      for (const h of [0, 4, 8, 12, 16, 20, 24]) {
+        svg.push(`<text x="${xOf(h).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${clockForHour(h)}</text>`);
+      }
+
+      // Effect window (작용 구간): a distinct amber band with dashed edges, drawn
+      // only when the profile defines one (accumulation meds have none).
+      const windows = effectWindows();
+      const hasWindow = windows.length > 0;
+      for (const window of windows) {
+        const ex0 = xOf(Math.max(window.start, grid.startHour));
+        const ex1 = xOf(Math.min(window.end, grid.endHour));
+        svg.push(`<rect x="${ex0.toFixed(1)}" y="${padT}" width="${(ex1 - ex0).toFixed(1)}" height="${plotH}" fill="var(--effect-band)"/>`);
+        for (const ex of [ex0, ex1]) {
+          svg.push(`<line x1="${ex.toFixed(1)}" y1="${padT}" x2="${ex.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="var(--effect-edge)" stroke-dasharray="3 3" stroke-width="1"/>`);
+        }
+      }
+      document.querySelectorAll(".effect-only").forEach((el) => { el.style.display = hasWindow ? "" : "none"; });
+
+      svg.push(`<path d="${areaFrom(series)}" fill="var(--accent-soft)"/>`);
+      if (secondDoseEnabled && !normalized) {
+        svg.push(`<path d="${pathFrom(primary.series)}" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.85"/>`);
+      }
+      svg.push(`<path d="${pathFrom(series)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`);
+
+      if (showComponents && hasErStage()) {
+        svg.push(`<path d="${pathFrom(components.ir)}" fill="none" stroke="var(--ir)" stroke-width="1.6" stroke-dasharray="4 3"/>`);
+        svg.push(`<path d="${pathFrom(components.er)}" fill="none" stroke="var(--er)" stroke-width="1.6" stroke-dasharray="4 3"/>`);
+      }
+
+      const peakVal = normalized ? 100 : stats.cmaxRaw;
+      const markers = normalized
+        ? [{ p: { hour: stats.tmaxHour, v: peakVal }, color: "var(--accent)" }]
+        : [
+            { p: { hour: firstPeak.hour, v: firstPeak.raw }, color: "var(--ir)" },
+            { p: { hour: stats.tmaxHour, v: peakVal }, color: "var(--accent)" },
+          ];
+      for (const m of markers) {
+        svg.push(`<circle cx="${xOf(m.p.hour).toFixed(1)}" cy="${yOf(m.p.v).toFixed(1)}" r="3.2" fill="${m.color}" stroke="var(--surface)" stroke-width="1.5"/>`);
+      }
+      svg.push(`<g id="chartHoverGuide" class="hover-guide" hidden>
+        <line id="chartHoverLine" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT + plotH).toFixed(1)}"/>
+        <circle id="chartHoverDot" cx="${padL}" cy="${yOf(0).toFixed(1)}" r="4"/>
+      </g>`);
+      svg.push(`<g id="chartSelectedGuide" class="selected-guide" hidden>
+        <line id="chartSelectedLine" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT + plotH).toFixed(1)}"/>
+        <circle id="chartSelectedDot" cx="${padL}" cy="${yOf(0).toFixed(1)}" r="5"/>
+      </g>`);
+      svg.push(`<g id="chartNowGuide" class="now-guide" hidden>
+        <line id="chartNowLine" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT + plotH).toFixed(1)}"/>
+        <circle id="chartNowDot" cx="${padL}" cy="${yOf(0).toFixed(1)}" r="4.5"/>
+        <text id="chartNowLabel" x="${padL}" y="${padT + 10}" text-anchor="middle">지금</text>
+      </g>`);
+
+      chart.innerHTML = svg.join("");
+      hideChartHover();
+      renderSelectedGuide();
+      renderNowGuide();
+
+      // chips (hidden for accumulation; see render())
+      const hasDistinctFirstPeak = hasErStage() && stats.tmaxHour - firstPeak.hour > 0.5;
+      document.getElementById("chipFirst").innerHTML = hasDistinctFirstPeak
+        ? `${firstPeak.hour.toFixed(1)}<span class="unit"> h</span>` : "–";
+      document.getElementById("chipMax").innerHTML = `${stats.tmaxHour.toFixed(1)}<span class="unit"> h · ${stats.cmaxRaw.toFixed(1)} ng/mL</span>`;
+      document.getElementById("chipEnd").innerHTML = `${profile.effectEndHours}<span class="unit"> h</span>`;
+      document.querySelectorAll(".comp-only").forEach((el) => {
+        el.style.display = showComponents && hasErStage() ? "" : "none";
+      });
+      document.querySelectorAll(".multi-dose-only").forEach((el) => {
+        el.style.display = secondDoseEnabled && !normalized ? "" : "none";
+      });
+      document.querySelectorAll(".now-only").forEach((el) => {
+        el.style.display = normalized ? "none" : "";
+      });
+    }
+
+    // ----- effect accrual timeline (accumulation meds only) -----
+    function renderEffect() {
+      const acc = profile.effectAccrual;
+      const endW = Math.max(...medConfig.weeks);
+      const eW = 360, eH = 130, eL = 30, eR = 12, eT = 12, eB = 22;
+      const epW = eW - eL - eR, epH = eH - eT - eB;
+      const exOf = (w) => eL + (w / endW) * epW;
+      const eyOf = (pct) => eT + epH - (pct / 100) * epH;
+      const series = buildEffectAccrualSeries({ effectAccrual: acc, endWeeks: endW, stepWeeks: 0.25 });
+      const svg = [];
+
+      for (const pct of [0, 50, 100]) {
+        const y = eyOf(pct).toFixed(1);
+        svg.push(`<line x1="${eL}" y1="${y}" x2="${eW - eR}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`);
+        svg.push(`<text x="${eL - 5}" y="${(+y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${pct}</text>`);
+      }
+      for (const w of medConfig.weeks) {
+        svg.push(`<text x="${exOf(w).toFixed(1)}" y="${eH - 6}" text-anchor="middle" font-size="9" fill="var(--text-dim)">${w}</text>`);
+      }
+      // onset / stabilize guides
+      for (const g of [acc.onsetWeeks, acc.stabilizeWeeks]) {
+        svg.push(`<line x1="${exOf(g).toFixed(1)}" y1="${eT}" x2="${exOf(g).toFixed(1)}" y2="${eT + epH}" stroke="var(--line)" stroke-dasharray="3 3" stroke-width="1"/>`);
+      }
+      const linePath = series
+        .map((s, i) => `${i === 0 ? "M" : "L"}${exOf(s.week).toFixed(1)} ${eyOf(s.percent).toFixed(1)}`)
+        .join(" ");
+      const x0 = exOf(0).toFixed(1), xN = exOf(endW).toFixed(1), yB = eyOf(0).toFixed(1);
+      svg.push(`<path d="${linePath} L${xN} ${yB} L${x0} ${yB} Z" fill="var(--accent-soft)"/>`);
+      svg.push(`<path d="${linePath}" fill="none" stroke="var(--er)" stroke-width="2.4" stroke-linejoin="round"/>`);
+
+      const nowPct = effectAccrualFraction(week, acc) * 100;
+      svg.push(`<line x1="${exOf(week).toFixed(1)}" y1="${eT}" x2="${exOf(week).toFixed(1)}" y2="${eT + epH}" stroke="var(--accent)" stroke-width="1.5"/>`);
+      svg.push(`<circle cx="${exOf(week).toFixed(1)}" cy="${eyOf(nowPct).toFixed(1)}" r="3.6" fill="var(--accent)" stroke="var(--surface)" stroke-width="1.5"/>`);
+      effectChart.innerHTML = svg.join("");
+
+      document.getElementById("chipOnset").innerHTML = `${acc.onsetWeeks}<span class="unit"> 주</span>`;
+      document.getElementById("chipStabilize").innerHTML = `${acc.stabilizeWeeks}<span class="unit"> 주</span>`;
+      document.getElementById("chipNow").innerHTML = `${nowPct.toFixed(0)}<span class="unit"> %</span>`;
+    }
+
+    // ----- explanation, key facts, evidence (data-driven from the profile) -----
+    const TYPE_LABEL = {
+      "regulatory-label": "규제 라벨",
+      "peer-reviewed": "동료심사",
+      "model-form-reference": "모델 방법론",
+      "clinical-guidance": "임상 가이드",
+      "derived-estimate": "파생 추정",
+    };
+    const CONF_LABEL = { high: "높음", medium: "중간", low: "낮음" };
+    const RELEASE_LABEL = {
+      "oros-dual": "OROS 서방정 (IR+ER)",
+      immediate: "속방정",
+      "er-capsule": "서방캡슐 (IR+ER)",
+    };
+
+    function renderExplanation() {
+      document.getElementById("explainBody").innerHTML =
+        medConfig.sheet.map((p) => `<p>${p}</p>`).join("");
+    }
+
+    function renderFacts() {
+      const r = profile.reference;
+      const norm = isAccum();
+      const rows = [
+        ["제형", RELEASE_LABEL[profile.releaseProfile] ?? profile.releaseProfile],
+        ["모델 종류", norm ? "누적형 (수주~수개월)" : "당일 곡선"],
+        ["Tmax (최고 시간)", `${r.tmaxHours} 시간`],
+        ["반감기", `${profile.halfLifeHours} 시간`],
+      ];
+      if (norm) {
+        rows.push(["Cmax / AUC", "정규화 표시 (라벨에 절대값 없음)"]);
+        rows.push(["효과 발현 / 안정화", `${profile.effectAccrual.onsetWeeks}주 / ${profile.effectAccrual.stabilizeWeeks}주`]);
+      } else {
+        rows.push([`Cmax (${r.calibrationDoseMg}mg)`, r.cmaxNgPerMl != null ? `${r.cmaxNgPerMl} ng/mL` : "—"]);
+        rows.push([`AUC (${r.calibrationDoseMg}mg)`, `${r.aucNgHPerMl} ng·h/mL`]);
+      }
+      if (Number.isFinite(profile.effectStartHours) && Number.isFinite(profile.effectEndHours)) {
+        rows.push(["작용 구간 (임상 추정)", `${profile.effectStartHours}~${profile.effectEndHours} 시간`]);
+      }
+      document.getElementById("factsBody").innerHTML = rows
+        .map(([k, v]) => `<div class="kv-row"><dt>${k}</dt><dd>${v}</dd></div>`)
+        .join("");
+    }
+
+    function renderEvidence() {
+      document.getElementById("evidenceBody").innerHTML = (profile.evidence ?? [])
+        .map((e) => {
+          const type = TYPE_LABEL[e.type] ?? e.type;
+          const conf = CONF_LABEL[e.confidence] ?? e.confidence;
+          const link = e.url
+            ? `<a class="source-link" href="${e.url}" target="_blank" rel="noopener">원문 보기 ↗</a>`
+            : "";
+          return `<li class="source-item">
+            <div class="source-head">
+              <span class="badge badge-type">${type}</span>
+              <span class="badge badge-${e.confidence}">신뢰도 ${conf}</span>
+            </div>
+            <div class="source-name">${e.source}</div>
+            ${e.note ? `<div class="source-note">${e.note}</div>` : ""}
+            ${link}
+          </li>`;
+        })
+        .join("");
+    }
+
+    function render() {
+      const accum = isAccum();
+      document.getElementById("effectCard").hidden = !accum;
+      document.getElementById("weeksCard").hidden = !accum;
+      document.getElementById("doseCard").hidden = accum;
+      secondDoseRow.hidden = accum || !secondDoseEnabled;
+      secondDoseAmountRow.hidden = accum || !secondDoseEnabled;
+      document.getElementById("chartChips").style.display = accum ? "none" : "";
+      document.getElementById("chartTitle").textContent = accum ? "정상상태 일일 농도 (정규화)" : "혈중 농도 추정";
+
+      const note = document.getElementById("chartNote");
+      note.hidden = !accum;
+      if (accum) note.innerHTML = "매일 복용해 농도가 안정된 뒤의 하루 패턴(피크 대비 %)입니다. 이 일일 곡선은 <strong>효과의 세기를 나타내지 않습니다</strong> — 효과는 위 누적 경과를 보세요.";
+
+      if (accum) renderEffect();
+      renderDailyCurve();
+
+      document.getElementById("medName").textContent = `${profile.brandName} 농도`;
+      document.getElementById("medGeneric").textContent =
+        `${profile.displayName} · ${profile.genericName} · 교육용 추정 · 의료 조언 아님`;
+      renderExplanation();
+      renderFacts();
+      renderEvidence();
+    }
+
+    function selectMed(id) {
+      medConfig = DEMO_MEDS.find((m) => m.id === id);
+      profile = profiles[medConfig.id];
+      dose = medConfig.defaultDose;
+      secondDose = medConfig.defaultDose;
+      week = medConfig.defaultWeek ?? 0;
+      showComponents = false;
+      document.getElementById("compToggle").checked = false;
+      renderSegments();
+      render();
+    }
+
+    medSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-med]");
+      if (btn) selectMed(btn.dataset.med);
+    });
+    doseSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-dose]");
+      if (!btn) return;
+      dose = Number(btn.dataset.dose);
+      doseSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    secondDoseSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-second-dose]");
+      if (!btn) return;
+      secondDose = Number(btn.dataset.secondDose);
+      secondDoseSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    weekSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-week]");
+      if (!btn) return;
+      week = Number(btn.dataset.week);
+      weekSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    document.getElementById("compToggle").addEventListener("change", (e) => {
+      showComponents = e.target.checked;
+      render();
+    });
+    doseTimeInput.addEventListener("input", render);
+    secondDoseTimeInput.addEventListener("input", render);
+    secondDoseToggle.addEventListener("change", (e) => {
+      secondDoseEnabled = e.target.checked;
+      render();
+    });
+
+    function formatElapsedHours(hour) {
+      const rounded = Math.round(hour * 10) / 10;
+      if (rounded === 0) return "복용 직후";
+      if (rounded < 1) return `${Math.round(rounded * 60)}분 경과`;
+      return `${rounded.toFixed(Number.isInteger(rounded) ? 0 : 1)}시간 경과`;
+    }
+
+    function nearestPointForClientX(clientX) {
+      if (!currentSeries.length) return null;
+      const rect = chart.getBoundingClientRect();
+      if (rect.width <= 0) return null;
+      const svgX = ((clientX - rect.left) / rect.width) * W;
+      const hour = clamp(((svgX - padL) / plotW) * grid.endHour, grid.startHour, grid.endHour);
+      return nearestPointForHour(hour);
+    }
+
+    function nearestPointForHour(hour) {
+      if (!currentSeries.length) return null;
+      return currentSeries.reduce((nearest, point) => (
+        Math.abs(point.hour - hour) < Math.abs(nearest.hour - hour) ? point : nearest
+      ), currentSeries[0]);
+    }
+
+    function setGuidePoint(prefix, point) {
+      const x = xOf(point.hour);
+      const y = yOf(dv(point));
+      const guide = document.getElementById(`chart${prefix}Guide`);
+      const guideLine = document.getElementById(`chart${prefix}Line`);
+      const guideDot = document.getElementById(`chart${prefix}Dot`);
+
+      if (guide && guideLine && guideDot) {
+        guide.removeAttribute("hidden");
+        guideLine.setAttribute("x1", x.toFixed(1));
+        guideLine.setAttribute("x2", x.toFixed(1));
+        guideDot.setAttribute("cx", x.toFixed(1));
+        guideDot.setAttribute("cy", y.toFixed(1));
+      }
+      return { x, y };
+    }
+
+    function showChartHover(point) {
+      const { x, y } = setGuidePoint("Hover", point);
+
+      chartHoverTime.textContent = formatElapsedHours(point.hour);
+      chartHoverClock.textContent = clockForHour(point.hour);
+      chartHoverValue.textContent = currentNormalized
+        ? `피크 대비 ${point.percent.toFixed(0)}%`
+        : `추정 농도 ${point.raw.toFixed(1)} ng/mL`;
+      chartHoverEffect.textContent = effectStatusForHour(point.hour);
+      chartHover.style.left = `${clamp((x / W) * 100, 14, 86)}%`;
+      chartHover.style.top = `${clamp((y / H) * 100, 22, 92)}%`;
+      chartHover.classList.add("visible");
+      chartHover.setAttribute("aria-hidden", "false");
+    }
+
+    function hideChartHover() {
+      chartHover.classList.remove("visible");
+      chartHover.setAttribute("aria-hidden", "true");
+      const guide = document.getElementById("chartHoverGuide");
+      if (guide) guide.setAttribute("hidden", "");
+    }
+
+    function selectChartPoint(point) {
+      selectedHour = point.hour;
+      setGuidePoint("Selected", point);
+    }
+
+    function renderSelectedGuide() {
+      const guide = document.getElementById("chartSelectedGuide");
+      if (!guide) return;
+      if (selectedHour == null) {
+        guide.setAttribute("hidden", "");
+        return;
+      }
+      const point = nearestPointForHour(selectedHour);
+      if (point) setGuidePoint("Selected", point);
+    }
+
+    function renderNowGuide() {
+      const guide = document.getElementById("chartNowGuide");
+      const label = document.getElementById("chartNowLabel");
+      if (!guide || isAccum()) return;
+      const point = nearestPointForHour(elapsedNowHour());
+      if (!point) {
+        guide.setAttribute("hidden", "");
+        return;
+      }
+      const { x } = setGuidePoint("Now", point);
+      if (label) label.setAttribute("x", x.toFixed(1));
+    }
+
+    chart.addEventListener("pointermove", (e) => {
+      const point = nearestPointForClientX(e.clientX);
+      if (point) showChartHover(point);
+    });
+    chart.addEventListener("pointerdown", (e) => {
+      const point = nearestPointForClientX(e.clientX);
+      if (!point) return;
+      selectChartPoint(point);
+      showChartHover(point);
+    });
+    chart.addEventListener("pointerleave", hideChartHover);
+    chart.addEventListener("pointercancel", hideChartHover);
+    chart.addEventListener("focus", () => {
+      if (!currentSeries.length) return;
+      showChartHover(currentSeries.reduce((peak, point) => dv(point) > dv(peak) ? point : peak, currentSeries[0]));
+    });
+    chart.addEventListener("blur", hideChartHover);
+    setInterval(renderNowGuide, 60 * 1000);
+
+    // Init (optional ?med=<id> deep link for previews)
+    const requested = new URLSearchParams(location.search).get("med");
+    selectMed(requested && DEMO_MEDS.some((m) => m.id === requested) ? requested : DEMO_MEDS[0].id);
+  </script>
+</body>
+</html>
